@@ -9,9 +9,13 @@
 #define INC_MPL3115A2_H_
 
 #include "stm32f4xx_hal.h"
+#include "solar_processing_structs.h"
 
 // MPL3115A2 I2C address
-#define MPL3115A2_ADDRESS 0x60
+#define MPL3115A2_ADDR 0x60
+#define MPL3115A2_WRITE_ADDR 	(MPL3115A2_ADDR << 1)
+#define MPL3115A2_READ_ADDR 	((MPL3115A2_ADDR << 1) | 0x01)
+
 
 // MPL3115A2 Control Registers
 #define CTRL_REG_1		0x26
@@ -20,17 +24,14 @@
 #define PRESSURE_LSB    0x03
 
 
+void configure_MPL3115A2(I2C_HandleTypeDef &i2c_device);
 
-extern I2C_HandleTypeDef hi2c1;
+double read_baromateric_pressure(I2C_HandleTypeDef &i2c_device);
 
-void configure_MPL3115A2();
+/* Writes specified register via I2C. Pass in the starting ptr to a uint8_t buffer, with how many bytes you want to write */
+error_code i2c_write_register(I2C_HandleTypeDef &i2c_device, uint32_t reg_addr, uint8_t *data, uint16_t num_bytes);
 
-float read_baromateric_pressure();
-
-void i2c_write_register(uint32_t reg_addr, uint16_t data);
-
-uint16_t i2c_read_register(uint32_t reg_addr);
-
-
+/* Reads specified register via I2C. Pass in the starting ptr to a uint8_t buffer, with how many bytes you want to read */
+error_code i2c_read_register(I2C_HandleTypeDef &i2c_device, uint32_t reg_addr, uint8_t *buff, uint16_t num_bytes);
 
 #endif /* INC_MPL3115A2_H_ */
