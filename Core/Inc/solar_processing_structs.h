@@ -44,5 +44,4 @@ typedef enum {
 } error_code;
 
 
-
 #endif /* INC_SOLAR_PROCESSING_STRUCTS_H_ */
