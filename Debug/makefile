@@ -1,6 +1,6 @@
 ################################################################################
 # Automatically-generated file. Do not edit!
-# Toolchain: GNU Tools for STM32 (10.3-2021.10)
+# Toolchain: GNU Tools for STM32 (11.3.rel1)
 ################################################################################
 
 -include ../makefile.init
@@ -80,7 +80,7 @@ main-build: ost-pv-processing-module.elf secondary-outputs
 
 # Tool invocations
 ost-pv-processing-module.elf ost-pv-processing-module.map: $(OBJS) $(USER_OBJS) /Users/jmaff/src/eecs473/ost-pv-processing-module/STM32F407VETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-g++ -o "ost-pv-processing-module.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/Users/jmaff/src/eecs473/ost-pv-processing-module/STM32F407VETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="ost-pv-processing-module.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -lstdc++ -lsupc++ -Wl,--end-group
+	arm-none-eabi-g++ -o "ost-pv-processing-module.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/Users/jmaff/src/eecs473/ost-pv-processing-module/STM32F407VETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="ost-pv-processing-module.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -u _printf_float -Wl,--start-group -lc -lm -lstdc++ -lsupc++ -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

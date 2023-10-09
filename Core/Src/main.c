@@ -20,6 +20,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "stdio.h"
+#include "SHT30.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -43,14 +45,20 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
+UART_HandleTypeDef huart1;
+
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 8,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
+SHT30_t sht = { .hi2c = &hi2c1 };
+char msg[100];
+float temp = 0.0f;
+float rh = 0.0f;
 
 /* USER CODE END PV */
 
@@ -58,6 +66,7 @@ const osThreadAttr_t defaultTask_attributes = {
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_USART1_UART_Init(void);
 void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -66,7 +75,6 @@ void StartDefaultTask(void *argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
 /* USER CODE END 0 */
 
 /**
@@ -98,7 +106,22 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_I2C1_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+  sprintf(msg, "Init\n");
+  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+  if (!SHT30_init(&sht)) {
+	  sprintf(msg, "SHT30 init FAIL\n");
+	  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+	  return 0;
+  }
+
+  sprintf(msg, "SHT30 init OK\n");
+  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+
+  SHT30_read_temp_humidity(&sht, &temp, &rh);
+  sprintf(msg, "temp: %.2f, rh: %.2f\n", temp, rh);
+  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
 
   /* USER CODE END 2 */
 
@@ -222,6 +245,39 @@ static void MX_I2C1_Init(void)
 }
 
 /**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 9600;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -230,6 +286,7 @@ static void MX_GPIO_Init(void)
 {
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
 }
@@ -251,7 +308,10 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	SHT30_read_temp_humidity(&sht, &temp, &rh);
+	sprintf(msg, "temp: %.2f, rh: %.2f\n", temp, rh);
+	HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+    osDelay(4000);
   }
   /* USER CODE END 5 */
 }

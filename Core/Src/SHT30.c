@@ -21,7 +21,7 @@ static uint16_t uint8_to_uint16(uint8_t msb, uint8_t lsb)
 	return (uint16_t)((uint16_t)msb << 8u) | lsb;
 }
 
-uint8_t SHT_init(SHT30_t* sht) {
+uint8_t SHT30_init(SHT30_t* sht) {
 	assert(sht->hi2c->Init.NoStretchMode == I2C_NOSTRETCH_DISABLE);
 
 	uint8_t status_reg_and_checksum[3];

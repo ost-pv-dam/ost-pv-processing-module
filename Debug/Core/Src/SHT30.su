@@ -1,0 +1,5 @@
+../Core/Src/SHT30.c:3:16:calculate_crc	32	static
+../Core/Src/SHT30.c:19:17:uint8_to_uint16	16	static
+../Core/Src/SHT30.c:24:9:SHT30_init	40	static
+../Core/Src/SHT30.c:42:9:SHT30_send_cmd	32	static
+../Core/Src/SHT30.c:54:9:SHT30_read_temp_humidity	48	static
