@@ -2,6 +2,7 @@
 "./Core/Src/SHT30.o"
 "./Core/Src/freertos.o"
 "./Core/Src/main.o"
+"./Core/Src/selector.o"
 "./Core/Src/stm32f4xx_hal_msp.o"
 "./Core/Src/stm32f4xx_it.o"
 "./Core/Src/syscalls.o"

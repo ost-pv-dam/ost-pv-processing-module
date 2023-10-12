@@ -18,10 +18,11 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include <SHT30.hpp>
+#include <selector.hpp>
 #include "main.h"
 #include "cmsis_os.h"
 #include "stdio.h"
-#include "SHT30.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -55,7 +56,17 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
+// TODO: use real GPIO pins
+std::unordered_map<uint8_t, GPIOPortPin> panels = {
+		  {0, {GPIOA, GPIO_PIN_1}},
+		  {0, {GPIOA, GPIO_PIN_2}},
+		  {0, {GPIOA, GPIO_PIN_3}}
+};
+
 SHT30_t sht = { .hi2c = &hi2c1 };
+Selector selector(panels);
+
+
 char msg[100];
 float temp = 0.0f;
 float rh = 0.0f;
@@ -70,7 +81,7 @@ static void MX_USART1_UART_Init(void);
 void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
-
+void SelectorCycleTask(void* argument);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -109,6 +120,7 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   sprintf(msg, "Init\n");
+
   HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
   if (!SHT30_init(&sht)) {
 	  sprintf(msg, "SHT30 init FAIL\n");
@@ -117,10 +129,6 @@ int main(void)
   }
 
   sprintf(msg, "SHT30 init OK\n");
-  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
-
-  SHT30_read_temp_humidity(&sht, &temp, &rh);
-  sprintf(msg, "temp: %.2f, rh: %.2f\n", temp, rh);
   HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
 
   /* USER CODE END 2 */

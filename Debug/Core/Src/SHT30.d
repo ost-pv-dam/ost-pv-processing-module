@@ -1,4 +1,4 @@
-Core/Src/SHT30.o: ../Core/Src/SHT30.cpp ../Core/Inc/SHT30.h \
+Core/Src/SHT30.o: ../Core/Src/SHT30.cpp ../Core/Inc/SHT30.hpp \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
@@ -27,7 +27,7 @@ Core/Src/SHT30.o: ../Core/Src/SHT30.cpp ../Core/Inc/SHT30.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h
-../Core/Inc/SHT30.h:
+../Core/Inc/SHT30.hpp:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h:
