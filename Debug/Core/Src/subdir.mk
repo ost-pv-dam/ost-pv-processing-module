@@ -5,9 +5,7 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
-../Core/Src/SHT30.c \
 ../Core/Src/freertos.c \
-../Core/Src/main.c \
 ../Core/Src/stm32f4xx_hal_msp.c \
 ../Core/Src/stm32f4xx_it.c \
 ../Core/Src/syscalls.c \
@@ -15,12 +13,12 @@ C_SRCS += \
 ../Core/Src/system_stm32f4xx.c 
 
 CPP_SRCS += \
-../Core/Src/MPL3115A2.cpp 
+../Core/Src/MPL3115A2.cpp \
+../Core/Src/SHT30.cpp \
+../Core/Src/main.cpp 
 
 C_DEPS += \
-./Core/Src/SHT30.d \
 ./Core/Src/freertos.d \
-./Core/Src/main.d \
 ./Core/Src/stm32f4xx_hal_msp.d \
 ./Core/Src/stm32f4xx_it.d \
 ./Core/Src/syscalls.d \
@@ -39,7 +37,9 @@ OBJS += \
 ./Core/Src/system_stm32f4xx.o 
 
 CPP_DEPS += \
-./Core/Src/MPL3115A2.d 
+./Core/Src/MPL3115A2.d \
+./Core/Src/SHT30.d \
+./Core/Src/main.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes

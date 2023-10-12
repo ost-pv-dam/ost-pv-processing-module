@@ -14,8 +14,8 @@ typedef struct SHT30_t {
 	I2C_HandleTypeDef* hi2c;
 } SHT30_t;
 
-uint8_t SHT30_init(SHT30_t*);
-uint8_t SHT30_send_cmd(SHT30_t*, uint16_t cmd);
+uint8_t SHT30_init(SHT30_t* sht);
+uint8_t SHT30_send_cmd(SHT30_t* sht, uint16_t cmd);
 uint8_t SHT30_read_temp_humidity(SHT30_t* sht, float* temperature, float* humidity);
 
 #endif // SHT30_H

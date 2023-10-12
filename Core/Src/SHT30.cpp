@@ -40,7 +40,7 @@ uint8_t SHT30_init(SHT30_t* sht) {
 }
 
 uint8_t SHT30_send_cmd(SHT30_t* sht, uint16_t cmd) {
-	uint8_t command_buffer[2] = {(cmd & 0xff00u) >> 8u, cmd & 0xffu};
+	uint8_t command_buffer[2] = {(uint8_t)((cmd & 0xff00u) >> 8u), uint8_t(cmd & 0xffu)};
 
 	if (HAL_I2C_Master_Transmit(sht->hi2c, SHT30_I2C_ADDR << 1u, command_buffer, sizeof(command_buffer),
 								SHT30_I2C_TIMEOUT) != HAL_OK) {
