@@ -58,9 +58,9 @@ const osThreadAttr_t defaultTask_attributes = {
 /* USER CODE BEGIN PV */
 // TODO: use real GPIO pins
 std::unordered_map<uint8_t, GPIOPortPin> panels = {
-		  {0, {GPIOA, GPIO_PIN_1}},
-		  {0, {GPIOA, GPIO_PIN_2}},
-		  {0, {GPIOA, GPIO_PIN_3}}
+		  {0, {GPIOD, GPIO_PIN_12}},
+		  {1, {GPIOD, GPIO_PIN_13}},
+		  {2, {GPIOD, GPIO_PIN_14}}
 };
 
 SHT30_t sht = { .hi2c = &hi2c1 };
@@ -71,6 +71,7 @@ char msg[100];
 float temp = 0.0f;
 float rh = 0.0f;
 
+osThreadId_t selectorTaskHandle;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -157,7 +158,7 @@ int main(void)
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+  selectorTaskHandle = osThreadNew(SelectorCycleTask, NULL, &defaultTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -322,6 +323,15 @@ void StartDefaultTask(void *argument)
     osDelay(4000);
   }
   /* USER CODE END 5 */
+}
+
+void SelectorCycleTask(void* argument) {
+	for(;;) {
+		for (const auto& panel : panels) {
+			selector.select(panel.first);
+			osDelay(1000);
+		}
+	}
 }
 
 /**
