@@ -36,6 +36,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+//#define SHT30_D
+#define SELECTOR_D
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -56,7 +58,6 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
-// TODO: use real GPIO pins
 std::unordered_map<uint8_t, GPIOPortPin> panels = {
 		  {0, {GPIOD, GPIO_PIN_12}},
 		  {1, {GPIOD, GPIO_PIN_13}},
@@ -122,6 +123,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   sprintf(msg, "Init\n");
 
+#ifdef SHT30_D
   HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
   if (!SHT30_init(&sht)) {
 	  sprintf(msg, "SHT30 init FAIL\n");
@@ -131,7 +133,11 @@ int main(void)
 
   sprintf(msg, "SHT30 init OK\n");
   HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+#endif
 
+#ifdef SELECTOR_D
+  selector.deselect_all();
+#endif
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -158,7 +164,9 @@ int main(void)
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
+#ifdef SELECTOR_D
   selectorTaskHandle = osThreadNew(SelectorCycleTask, NULL, &defaultTask_attributes);
+#endif
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
