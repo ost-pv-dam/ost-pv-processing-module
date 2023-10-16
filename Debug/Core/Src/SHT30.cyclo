@@ -1,5 +1,5 @@
-../Core/Src/SHT30.c:3:16:calculate_crc	4
-../Core/Src/SHT30.c:19:17:uint8_to_uint16	1
-../Core/Src/SHT30.c:24:9:SHT30_init	3
-../Core/Src/SHT30.c:42:9:SHT30_send_cmd	2
-../Core/Src/SHT30.c:54:9:SHT30_read_temp_humidity	4
+../Core/Src/SHT30.cpp:3:16:uint8_t calculate_crc(const uint8_t*, size_t)	4
+../Core/Src/SHT30.cpp:19:17:uint16_t uint8_to_uint16(uint8_t, uint8_t)	1
+../Core/Src/SHT30.cpp:24:9:uint8_t SHT30_init(SHT30_t*)	3
+../Core/Src/SHT30.cpp:42:9:uint8_t SHT30_send_cmd(SHT30_t*, uint16_t)	2
+../Core/Src/SHT30.cpp:54:9:uint8_t SHT30_read_temp_humidity(SHT30_t*, float*, float*)	4
