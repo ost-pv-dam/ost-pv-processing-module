@@ -36,7 +36,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 //#define SHT30_D
-#define SELECTOR_D
+//#define SELECTOR_D
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -60,7 +60,7 @@ UART_HandleTypeDef huart3;
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 128 * 8,
+  .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
@@ -133,11 +133,20 @@ int main(void)
   MX_USART1_UART_Init();
   MX_ADC1_Init();
   MX_I2C2_Init();
-//  MX_SDIO_SD_Init();
+  //MX_SDIO_SD_Init();
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
   sprintf(msg, "Init\n");
+  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+
+  char esp_buf[1000] = {0};
+  sprintf(esp_buf, "AT\r\n");
+  HAL_UART_Transmit(&huart2, (uint8_t*) esp_buf, 8, 100);
+  HAL_UART_Receive(&huart2, (uint8_t*) esp_buf, sizeof(esp_buf), 5000);
+
+  HAL_UART_Transmit(&huart1, (uint8_t*) esp_buf, sizeof(esp_buf), 100);
+
 
 #ifdef SHT30_D
   HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
