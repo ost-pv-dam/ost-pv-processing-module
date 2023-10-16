@@ -26,6 +26,8 @@
 #include <SHT30.hpp>
 #include <selector.hpp>
 #include "stdio.h"
+#include "string.h"
+#include <string>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,6 +57,7 @@ SD_HandleTypeDef hsd;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
+DMA_HandleTypeDef hdma_usart2_rx;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -73,6 +76,8 @@ std::unordered_map<uint8_t, GPIOPortPin> panels = {
 SHT30_t sht = { .hi2c = &hi2c1 };
 Selector selector(panels);
 
+uint8_t esp_rx_buf[1000] = {0};
+
 
 char msg[100];
 float temp = 0.0f;
@@ -84,6 +89,7 @@ osThreadId_t selectorTaskHandle;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_ADC1_Init(void);
@@ -129,6 +135,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   MX_ADC1_Init();
@@ -140,12 +147,22 @@ int main(void)
   sprintf(msg, "Init\n");
   HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
 
-  char esp_buf[1000] = {0};
-  sprintf(esp_buf, "AT\r\n");
-  HAL_UART_Transmit(&huart2, (uint8_t*) esp_buf, 8, 100);
-  HAL_UART_Receive(&huart2, (uint8_t*) esp_buf, sizeof(esp_buf), 5000);
+  char esp_buf[50] = {0};
+  char rx_buf[50] = {0}; // original message + CRLF + OK
 
-  HAL_UART_Transmit(&huart1, (uint8_t*) esp_buf, sizeof(esp_buf), 100);
+  /* will turn below code into a function for sending any command */
+  std::string command = "AT+RESTORE\r\n";
+  memcpy(esp_buf, command.c_str(), command.length()); // copy to buffer, NO NULL TERMINATOR
+
+  HAL_UART_Transmit(&huart2, (uint8_t*) esp_buf, command.length(), 100); // make sure to not send any extra bytes
+  HAL_UART_Receive(&huart2, (uint8_t*) rx_buf, sizeof(rx_buf), 100);
+
+  // ESP will echo back your command, plus CRLF, then its response
+  if (!strcmp(&rx_buf[command.length() + 2], "OK\r\n")) {
+	  sprintf(msg, "ESP32+AT success\n");
+	  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+  }
+  /* end ESP example command */
 
 
 #ifdef SHT30_D
@@ -507,6 +524,22 @@ static void MX_USART3_UART_Init(void)
   /* USER CODE BEGIN USART3_Init 2 */
 
   /* USER CODE END USART3_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
 
 }
 
