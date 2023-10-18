@@ -1,4 +1,5 @@
 Core/Src/MPL3115A2.o: ../Core/Src/MPL3115A2.cpp ../Core/Inc/MPL3115A2.h \
+ ../Core/Inc/solar_processing_structs.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
@@ -26,9 +27,11 @@ Core/Src/MPL3115A2.o: ../Core/Src/MPL3115A2.cpp ../Core/Inc/MPL3115A2.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_i2c_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr_ex.h \
- ../Core/Inc/solar_processing_structs.h
+ ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h
 
 ../Core/Inc/MPL3115A2.h:
+
+../Core/Inc/solar_processing_structs.h:
 
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 
@@ -84,4 +87,4 @@ Core/Src/MPL3115A2.o: ../Core/Src/MPL3115A2.cpp ../Core/Inc/MPL3115A2.h \
 
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr_ex.h:
 
-../Core/Inc/solar_processing_structs.h:
+../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h:

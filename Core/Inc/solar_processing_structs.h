@@ -9,8 +9,8 @@
 #define INC_SOLAR_PROCESSING_STRUCTS_H_
 
 #include <time.h>
-#include <unordered_map>
-#include <vector>
+//#include <unordered_map>
+//#include <vector>
 
 /* measured cell voltage for the supplied current */
 typedef struct {
@@ -28,8 +28,8 @@ typedef struct {
 	double ambient_temp;
 	double humidity;
 	double barometric_pressure;
-	std::unordered_map<char, std::vector<current_voltage_pair>> iv_curves;
-	std::unordered_map<char, double> cell_temperatures;
+//	std::unordered_map<char, std::vector<current_voltage_pair>> iv_curves;
+//	std::unordered_map<char, double> cell_temperatures;
 
 
 } sensor_data_packet;
