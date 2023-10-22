@@ -23,11 +23,14 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <SHT30.hpp>
-#include <selector.hpp>
 #include "stdio.h"
 #include "string.h"
 #include <string>
+
+#include "SHT30.hpp"
+#include "selector.hpp"
+#include "logger.hpp"
+#include "ESP32.hpp"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -39,6 +42,7 @@
 /* USER CODE BEGIN PD */
 //#define SHT30_D
 //#define SELECTOR_D
+#define ESP32_D
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -73,11 +77,10 @@ std::unordered_map<uint8_t, GPIOPortPin> panels = {
 		  {2, {GPIOD, GPIO_PIN_14}}
 };
 
+Logger logger(huart1, LogLevel::Debug);
 SHT30_t sht = { .hi2c = &hi2c1 };
 Selector selector(panels);
-
-uint8_t esp_rx_buf[1000] = {0};
-
+ESP32 esp(huart2);
 
 char msg[100];
 float temp = 0.0f;
@@ -144,25 +147,19 @@ int main(void)
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
-  sprintf(msg, "Init\n");
-  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+  logger.debug("Init");
 
-  char esp_buf[50] = {0};
-  char rx_buf[50] = {0}; // original message + CRLF + OK
-
-  /* will turn below code into a function for sending any command */
-  std::string command = "AT+RESTORE\r\n";
-  memcpy(esp_buf, command.c_str(), command.length()); // copy to buffer, NO NULL TERMINATOR
-
-  HAL_UART_Transmit(&huart2, (uint8_t*) esp_buf, command.length(), 100); // make sure to not send any extra bytes
-  HAL_UART_Receive(&huart2, (uint8_t*) rx_buf, sizeof(rx_buf), 100);
-
-  // ESP will echo back your command, plus CRLF, then its response
-  if (!strcmp(&rx_buf[command.length() + 2], "OK\r\n")) {
-	  sprintf(msg, "ESP32+AT success\n");
-	  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+#ifdef ESP32_D
+  if (!esp.init()) {
+	  logger.error("ESP32 init FAIL!");
+  } else {
+	  logger.info("ESP32 init SUCCESS");
   }
-  /* end ESP example command */
+
+  esp.send_cmd("AT+GMR");
+  std::string esp_resp = esp.poll(100);
+  logger.debug(esp_resp);
+#endif
 
 
 #ifdef SHT30_D
@@ -594,13 +591,13 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
-  for(;;)
-  {
-	SHT30_read_temp_humidity(&sht, &temp, &rh);
-	sprintf(msg, "temp: %.2f, rh: %.2f\n", temp, rh);
-	HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
-    osDelay(4000);
-  }
+//  for(;;)
+//  {
+//	SHT30_read_temp_humidity(&sht, &temp, &rh);
+//	sprintf(msg, "temp: %.2f, rh: %.2f\n", temp, rh);
+//	HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+//    osDelay(4000);
+//  }
   /* USER CODE END 5 */
 }
 
