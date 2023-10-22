@@ -13,7 +13,7 @@ int ESP32::init() {
 
 	std::string resp = poll(ESP_ECHO_OFF_OK.length());
 	if (resp != ESP_ECHO_OFF_OK && resp != ESP_OK) {
-		return 0;
+		return 0; // init FAIL
 	}
 
 	return 1;
@@ -26,4 +26,26 @@ std::string ESP32::poll(int num_bytes) {
 	delete[] buf;
 
 	return ret;
+}
+
+void ESP32::process_incoming_bytes(char* buf, int num_bytes) {
+	for (int i = 0; i < num_bytes; i++) {
+		if (current_message.length() > 1 && buf[i] == '\n' && current_message.back() == '\r') {
+			messages.push(current_message + buf[i]);
+			osSemaphoreRelease(messages_sem);
+			current_message = "";
+		} else {
+			current_message += buf[i];
+		}
+	}
+}
+
+std::string ESP32::consume_message() {
+	if (!messages.empty()) {
+		std::string msg = messages.front();
+		messages.pop();
+		return msg;
+	} else {
+		return "ERROR -- This should never be seen";
+	}
 }

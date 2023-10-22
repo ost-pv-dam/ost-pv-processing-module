@@ -71,6 +71,8 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
+osSemaphoreId_t esp_messages_sem;
+
 std::unordered_map<uint8_t, GPIOPortPin> panels = {
 		  {0, {GPIOD, GPIO_PIN_12}},
 		  {1, {GPIOD, GPIO_PIN_13}},
@@ -80,13 +82,23 @@ std::unordered_map<uint8_t, GPIOPortPin> panels = {
 Logger logger(huart1, LogLevel::Debug);
 SHT30_t sht = { .hi2c = &hi2c1 };
 Selector selector(panels);
-ESP32 esp(huart2);
+ESP32 esp(huart2, esp_messages_sem);
+
+char esp_buf[4];
 
 char msg[100];
 float temp = 0.0f;
 float rh = 0.0f;
 
 osThreadId_t selectorTaskHandle;
+osThreadId_t httpSendTaskHandle;
+osThreadId_t processHandle;
+
+typedef struct {                                // object data type
+  char Buf[4];
+} MSGQUEUE_OBJ_t;
+
+osMessageQueueId_t mid_MsgQueue;                // message queue id
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -104,6 +116,8 @@ void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 void SelectorCycleTask(void* argument);
+void SendHTTPTask(void* argument);
+void ProcessUartTask(void* argument);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -156,9 +170,14 @@ int main(void)
 	  logger.info("ESP32 init SUCCESS");
   }
 
+//  esp.send_cmd("AT+GMR");
+//  std::string esp_resp = esp.poll(100);
+//  logger.debug(esp_resp);
+
+  HAL_UART_Receive_IT(&huart2, (uint8_t*) esp_buf, 4);
   esp.send_cmd("AT+GMR");
-  std::string esp_resp = esp.poll(100);
-  logger.debug(esp_resp);
+
+
 #endif
 
 
@@ -187,7 +206,7 @@ int main(void)
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
+  esp_messages_sem = osSemaphoreNew(30U, 0U, NULL);
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -195,17 +214,20 @@ int main(void)
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
+  mid_MsgQueue = osMessageQueueNew(16, sizeof(MSGQUEUE_OBJ_t), NULL);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
   /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+//  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
 #ifdef SELECTOR_D
   selectorTaskHandle = osThreadNew(SelectorCycleTask, NULL, &defaultTask_attributes);
 #endif
+
+  httpSendTaskHandle = osThreadNew(SendHTTPTask, NULL, &defaultTask_attributes);
+  processHandle = osThreadNew(ProcessUartTask, NULL,  &defaultTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -479,7 +501,7 @@ static void MX_USART2_UART_Init(void)
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
   huart2.Init.Mode = UART_MODE_TX_RX;
-  huart2.Init.HwFlowCtl = UART_HWCONTROL_RTS_CTS;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart2.Init.OverSampling = UART_OVERSAMPLING_16;
   if (HAL_UART_Init(&huart2) != HAL_OK)
   {
@@ -576,6 +598,40 @@ void SelectorCycleTask(void* argument) {
 		}
 		osDelay(10000);
 	}
+}
+
+void SendHTTPTask(void* argument) {
+	uint32_t tick = osKernelGetTickCount();
+
+	for(;;) {
+		tick += 10000U;
+
+		esp.send_cmd("AT+GMR");
+		osSemaphoreAcquire(esp_messages_sem, 5000);
+		logger.info(esp.consume_message());
+
+		osDelayUntil(tick);
+	}
+}
+
+void ProcessUartTask(void* argument) {
+	MSGQUEUE_OBJ_t msg;
+
+	for(;;) {
+		osMessageQueueGet(mid_MsgQueue, &msg, NULL, 0U);
+		esp.process_incoming_bytes(msg.Buf, 4);
+	}
+}
+
+extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+//  esp.process_incoming_bytes(esp_buf, 4);
+  MSGQUEUE_OBJ_t msg;
+  memcpy(msg.Buf, esp_buf, 4);
+
+  osMessageQueuePut(mid_MsgQueue, &msg, 0U, 0U);
+
+  HAL_UART_Receive_IT(&huart2, (uint8_t*) esp_buf, 4);
 }
 
 /* USER CODE END 4 */
