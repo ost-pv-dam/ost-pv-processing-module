@@ -84,7 +84,7 @@ SHT30_t sht = { .hi2c = &hi2c1 };
 Selector selector(panels);
 ESP32 esp(huart2, esp_messages_sem);
 
-char esp_buf[4];
+uint8_t esp_buf;
 
 char msg[100];
 float temp = 0.0f;
@@ -94,9 +94,6 @@ osThreadId_t selectorTaskHandle;
 osThreadId_t httpSendTaskHandle;
 osThreadId_t processHandle;
 
-typedef struct {                                // object data type
-  char Buf[4];
-} MSGQUEUE_OBJ_t;
 
 osMessageQueueId_t mid_MsgQueue;                // message queue id
 /* USER CODE END PV */
@@ -157,26 +154,24 @@ int main(void)
   MX_USART1_UART_Init();
   MX_ADC1_Init();
   MX_I2C2_Init();
-  //MX_SDIO_SD_Init();
+//  MX_SDIO_SD_Init();
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
+  Logger::registerInstance(&logger);
   logger.debug("Init");
 
+
 #ifdef ESP32_D
+  HAL_Delay(500); // allow ESP to finish any commands from before reset
   if (!esp.init()) {
 	  logger.error("ESP32 init FAIL!");
   } else {
 	  logger.info("ESP32 init SUCCESS");
   }
 
-//  esp.send_cmd("AT+GMR");
-//  std::string esp_resp = esp.poll(100);
-//  logger.debug(esp_resp);
-
-  HAL_UART_Receive_IT(&huart2, (uint8_t*) esp_buf, 4);
-  esp.send_cmd("AT+GMR");
-
+  HAL_Delay(500);
+  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
 
 #endif
 
@@ -214,12 +209,12 @@ int main(void)
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  mid_MsgQueue = osMessageQueueNew(16, sizeof(MSGQUEUE_OBJ_t), NULL);
+  mid_MsgQueue = osMessageQueueNew(16, sizeof(uint8_t), NULL);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
   /* creation of defaultTask */
-//  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
 #ifdef SELECTOR_D
@@ -496,7 +491,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 9600;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -604,34 +599,40 @@ void SendHTTPTask(void* argument) {
 	uint32_t tick = osKernelGetTickCount();
 
 	for(;;) {
-		tick += 10000U;
+		tick += 30000U;
 
-		esp.send_cmd("AT+GMR");
+		esp.send_cmd("AT+HTTPCLIENT=2,0,\"http://18.220.103.162:5050/api/v1/sensorCellData\",,,1");
+
+		// block until there's one semaphore available
 		osSemaphoreAcquire(esp_messages_sem, 5000);
-		logger.info(esp.consume_message());
+		std::string complete = "";
+		complete += esp.consume_message();
+
+		// now loop until we've cleared all pending messages
+		while (osSemaphoreGetCount(esp_messages_sem) > 0) {
+			osSemaphoreAcquire(esp_messages_sem, 5000);
+			complete += esp.consume_message();
+		}
+
+		logger.info(complete);
 
 		osDelayUntil(tick);
 	}
 }
 
 void ProcessUartTask(void* argument) {
-	MSGQUEUE_OBJ_t msg;
+	uint8_t incoming_byte;
 
 	for(;;) {
-		osMessageQueueGet(mid_MsgQueue, &msg, NULL, 0U);
-		esp.process_incoming_bytes(msg.Buf, 4);
+		osMessageQueueGet(mid_MsgQueue, &incoming_byte, NULL, osWaitForever);
+		esp.process_incoming_bytes((char*) &incoming_byte, 1);
 	}
 }
 
 extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-//  esp.process_incoming_bytes(esp_buf, 4);
-  MSGQUEUE_OBJ_t msg;
-  memcpy(msg.Buf, esp_buf, 4);
-
-  osMessageQueuePut(mid_MsgQueue, &msg, 0U, 0U);
-
-  HAL_UART_Receive_IT(&huart2, (uint8_t*) esp_buf, 4);
+  osMessageQueuePut(mid_MsgQueue, &esp_buf, 0U, 0U);
+  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
 }
 
 /* USER CODE END 4 */
@@ -646,14 +647,10 @@ extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  /* Infinite loop */
-//  for(;;)
-//  {
-//	SHT30_read_temp_humidity(&sht, &temp, &rh);
-//	sprintf(msg, "temp: %.2f, rh: %.2f\n", temp, rh);
-//	HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
-//    osDelay(4000);
-//  }
+  for (;;) {
+	  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
+	  osThreadSuspend(defaultTaskHandle);
+  }
   /* USER CODE END 5 */
 }
 

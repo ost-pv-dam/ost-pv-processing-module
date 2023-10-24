@@ -1,9 +1,11 @@
 #include "Logger.hpp"
 
+Logger* Logger::instance = nullptr;
+
 void Logger::log(LogLevel level, std::string msg) {
 	if (logLevel >= level) {
 		msg += newline;
-		HAL_UART_Transmit(&huart, (uint8_t*) msg.c_str(), msg.length(), 100);
+		HAL_UART_Transmit(&huart, (uint8_t*) msg.c_str(), msg.length(), 2000);
 		// TODO: write to SD log file
 	}
 }

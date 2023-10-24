@@ -21,10 +21,20 @@ public:
 	void warn(std::string msg);
 	void error(std::string msg);
 
+	static void registerInstance(Logger* inst) {
+		instance = inst;
+	}
+
+	static Logger* getInstance() {
+		return instance;
+	}
+
 private:
 	UART_HandleTypeDef& huart;
 	LogLevel logLevel;
 	std::string newline;
+
+	static Logger* instance;
 
 	void log(LogLevel level, std::string msg);
 };
