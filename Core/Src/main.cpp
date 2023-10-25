@@ -43,6 +43,8 @@
 //#define SHT30_D
 //#define SELECTOR_D
 #define ESP32_D
+
+#define ARRAY_LEN(x)            (sizeof(x) / sizeof((x)[0]))
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -96,6 +98,10 @@ osThreadId_t processHandle;
 
 
 osMessageQueueId_t mid_MsgQueue;                // message queue id
+
+/* DMA UART RX */
+osMessageQueueId_t usart_rx_dma_queue;
+uint8_t usart_rx_dma_buffer[256];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -115,6 +121,8 @@ void StartDefaultTask(void *argument);
 void SelectorCycleTask(void* argument);
 void SendHTTPTask(void* argument);
 void ProcessUartTask(void* argument);
+void usart_rx_check(uint16_t size);
+void usart_rx_dma_thread(void* arg);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -171,7 +179,7 @@ int main(void)
   }
 
   HAL_Delay(500);
-  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
+//  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
 
 #endif
 
@@ -209,7 +217,8 @@ int main(void)
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  mid_MsgQueue = osMessageQueueNew(16, sizeof(uint8_t), NULL);
+
+  usart_rx_dma_queue = osMessageQueueNew(10, sizeof(uint16_t), NULL);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -222,7 +231,8 @@ int main(void)
 #endif
 
   httpSendTaskHandle = osThreadNew(SendHTTPTask, NULL, &defaultTask_attributes);
-  processHandle = osThreadNew(ProcessUartTask, NULL,  &defaultTask_attributes);
+//  processHandle = osThreadNew(ProcessUartTask, NULL,  &defaultTask_attributes);
+  processHandle = osThreadNew(usart_rx_dma_thread, NULL, &defaultTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -491,7 +501,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 9600;
+  huart2.Init.BaudRate = 115200;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -599,9 +609,10 @@ void SendHTTPTask(void* argument) {
 	uint32_t tick = osKernelGetTickCount();
 
 	for(;;) {
-		tick += 30000U;
+		tick += 3000U;
 
-		esp.send_cmd("AT+HTTPCLIENT=2,0,\"http://18.220.103.162:5050/api/v1/sensorCellData\",,,1");
+//		esp.send_cmd("AT+HTTPCLIENT=2,0,\"http://18.220.103.162:5050/api/v1/sensorCellData\",,,1");
+		esp.send_cmd("AT+GMR");
 
 		// block until there's one semaphore available
 		osSemaphoreAcquire(esp_messages_sem, 5000);
@@ -629,10 +640,83 @@ void ProcessUartTask(void* argument) {
 	}
 }
 
-extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+void usart_rx_dma_thread(void* arg) {
+	uint8_t d;
+
+	for(;;) {
+		osMessageQueueGet(usart_rx_dma_queue, &d, NULL, osWaitForever);
+
+		usart_rx_check(d);
+	}
+}
+
+void usart_process_data(const uint8_t* data, size_t len) {
+    esp.process_incoming_bytes((char*) data, len);
+}
+
+void usart_rx_check(uint16_t size) {
+    static size_t old_pos = 0;
+    size_t pos;
+
+    /* Calculate current position in buffer and check for new data available */
+    pos = ARRAY_LEN(usart_rx_dma_buffer) - size;
+    if (pos != old_pos) {                       /* Check change in received data */
+        if (pos > old_pos) {                    /* Current position is over previous one */
+            /*
+             * Processing is done in "linear" mode.
+             *
+             * Application processing is fast with single data block,
+             * length is simply calculated by subtracting pointers
+             *
+             * [   0   ]
+             * [   1   ] <- old_pos |------------------------------------|
+             * [   2   ]            |                                    |
+             * [   3   ]            | Single block (len = pos - old_pos) |
+             * [   4   ]            |                                    |
+             * [   5   ]            |------------------------------------|
+             * [   6   ] <- pos
+             * [   7   ]
+             * [ N - 1 ]
+             */
+            usart_process_data(&usart_rx_dma_buffer[old_pos], pos - old_pos);
+        } else {
+            /*
+             * Processing is done in "overflow" mode..
+             *
+             * Application must process data twice,
+             * since there are 2 linear memory blocks to handle
+             *
+             * [   0   ]            |---------------------------------|
+             * [   1   ]            | Second block (len = pos)        |
+             * [   2   ]            |---------------------------------|
+             * [   3   ] <- pos
+             * [   4   ] <- old_pos |---------------------------------|
+             * [   5   ]            |                                 |
+             * [   6   ]            | First block (len = N - old_pos) |
+             * [   7   ]            |                                 |
+             * [ N - 1 ]            |---------------------------------|
+             */
+            usart_process_data(&usart_rx_dma_buffer[old_pos], ARRAY_LEN(usart_rx_dma_buffer) - old_pos);
+            if (pos > 0) {
+                usart_process_data(&usart_rx_dma_buffer[0], pos);
+            }
+        }
+        old_pos = pos;                          /* Save current position as old for next transfers */
+    }
+}
+
+//extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+//{
+//  osMessageQueuePut(mid_MsgQueue, &esp_buf, 0U, 0U);
+//  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
+//}
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-  osMessageQueuePut(mid_MsgQueue, &esp_buf, 0U, 0U);
-  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
+	osMessageQueuePut(usart_rx_dma_queue, &Size, 0, 0);
+
+	/* start the DMA again */
+	HAL_UARTEx_ReceiveToIdle_DMA(&huart2, usart_rx_dma_buffer, ARRAY_LEN(usart_rx_dma_buffer));
 }
 
 /* USER CODE END 4 */
@@ -648,7 +732,8 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
   for (;;) {
-	  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
+//	  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
+	  HAL_UARTEx_ReceiveToIdle_DMA(&huart2, usart_rx_dma_buffer, ARRAY_LEN(usart_rx_dma_buffer));
 	  osThreadSuspend(defaultTaskHandle);
   }
   /* USER CODE END 5 */

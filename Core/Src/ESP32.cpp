@@ -23,13 +23,14 @@ int ESP32::init() {
 
 	// set UART parameters
 	// NOTE: if you change the baud rate, you will need to change the STM baudrate too
-	send_cmd("AT+UART_CUR=9600,8,1,0,0");
+	send_cmd("AT+UART_CUR=115200,8,1,0,0");
 	resp = poll(ESP_RESP_LEN);
 	if (resp.find(ESP_OK) == std::string::npos) {
 		Logger::getInstance()->error("UART_CUR: " + resp);
 		return 0; // init FAIL
 	}
 
+	/*
 	HAL_Delay(100);
 
 	send_cmd("AT+HTTPCHEAD=" + std::to_string(ESP_API_HEADER.length()));
@@ -62,6 +63,7 @@ int ESP32::init() {
 		Logger::getInstance()->error("CWJAP: " + resp);
 		return 0; // init FAIL
 	}
+	*/
 
 	return 1;
 }
