@@ -30,7 +30,7 @@ int ESP32::init() {
 		return 0; // init FAIL
 	}
 
-	/*
+
 	HAL_Delay(100);
 
 	send_cmd("AT+HTTPCHEAD=" + std::to_string(ESP_API_HEADER.length()));
@@ -63,7 +63,7 @@ int ESP32::init() {
 		Logger::getInstance()->error("CWJAP: " + resp);
 		return 0; // init FAIL
 	}
-	*/
+
 
 	return 1;
 }
@@ -79,14 +79,38 @@ std::string ESP32::poll(int num_bytes, uint32_t timeout) {
 
 void ESP32::process_incoming_bytes(char* buf, int num_bytes) {
 	for (int i = 0; i < num_bytes; i++) {
-		if (current_message.length() > 1 && buf[i] == '\n' && current_message.back() == '\r') {
-			messages.push(current_message + buf[i]);
-			osSemaphoreRelease(messages_sem);
+		current_message += buf[i];
+		if (current_message.length() >= ESP_OK.length() &&
+				current_message.substr(current_message.length() - ESP_OK.length(), ESP_OK.length()) == ESP_OK) {
+			messages.push(current_message);
+			void* d = (void *)1;
+			osMessageQueuePut(external_queue, &d, 0, 0);
 			current_message = "";
-		} else {
-			current_message += buf[i];
+		} else if (current_message.length() >= ESP_READY.length() &&
+				current_message.substr(current_message.length() - ESP_READY.length(), ESP_READY.length()) == ESP_READY) {
+			osSemaphoreRelease(data_ready_sem);
 		}
 	}
+}
+
+
+
+void ESP32::send_data_packet(DataPacket& data) {
+	std::ostringstream postCmd;
+	std::string json = data.serialize_json();
+
+	Logger::getInstance()->debug(json);
+
+	postCmd << "AT+HTTPCPOST=\"http://httpbin.org/post\",";
+	postCmd << json.length();
+	postCmd << ",2,\"connection: keep-alive\",\"content-type: application/json\"";
+
+	send_cmd(postCmd.str());
+
+	// NOTE: not sure how FreeRTOS will response to these functions being called from cpp, look here if things break
+	osSemaphoreAcquire(data_ready_sem, osWaitForever);
+	send_cmd(json, false);
+	osSemaphoreRelease(data_ready_sem);
 }
 
 std::string ESP32::consume_message() {
@@ -97,4 +121,10 @@ std::string ESP32::consume_message() {
 	} else {
 		return "ERROR: someone tried to consume from an empty message queue";
 	}
+}
+
+void ESP32::flush() {
+	osMessageQueueReset(external_queue);
+	std::queue<std::string>().swap(messages);
+	current_message = "";
 }

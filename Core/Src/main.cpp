@@ -26,11 +26,13 @@
 #include "stdio.h"
 #include "string.h"
 #include <string>
+#include <sstream>
 
 #include "SHT30.hpp"
 #include "selector.hpp"
 #include "logger.hpp"
 #include "ESP32.hpp"
+#include "data.hpp"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -73,35 +75,39 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
-osSemaphoreId_t esp_messages_sem;
+/* RTOS */
+osThreadId_t selectorTaskHandle;
+osThreadId_t httpSendTaskHandle;
+osThreadId_t processHandle;
 
+osMessageQueueId_t usart_rx_dma_queue;
+osMessageQueueId_t esp_messages_queue;
+
+osSemaphoreId_t esp_data_ready_sem;
+
+/* CONFIG */
 std::unordered_map<uint8_t, GPIOPortPin> panels = {
 		  {0, {GPIOD, GPIO_PIN_12}},
 		  {1, {GPIOD, GPIO_PIN_13}},
 		  {2, {GPIOD, GPIO_PIN_14}}
 };
 
+/* PERIPHERALS */
 Logger logger(huart1, LogLevel::Debug);
 SHT30_t sht = { .hi2c = &hi2c1 };
 Selector selector(panels);
-ESP32 esp(huart2, esp_messages_sem);
+ESP32 esp(huart2, esp_messages_queue, esp_data_ready_sem);
 
+/* BUFFERS */
+DataPacket data_packet;
 uint8_t esp_buf;
-
 char msg[100];
 float temp = 0.0f;
 float rh = 0.0f;
-
-osThreadId_t selectorTaskHandle;
-osThreadId_t httpSendTaskHandle;
-osThreadId_t processHandle;
-
-
-osMessageQueueId_t mid_MsgQueue;                // message queue id
-
-/* DMA UART RX */
-osMessageQueueId_t usart_rx_dma_queue;
 uint8_t usart_rx_dma_buffer[256];
+
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -120,9 +126,9 @@ void StartDefaultTask(void *argument);
 /* USER CODE BEGIN PFP */
 void SelectorCycleTask(void* argument);
 void SendHTTPTask(void* argument);
-void ProcessUartTask(void* argument);
+void UsartRxReceiveTask(void* arg);
+
 void usart_rx_check(uint16_t size);
-void usart_rx_dma_thread(void* arg);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -209,7 +215,7 @@ int main(void)
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
-  esp_messages_sem = osSemaphoreNew(30U, 0U, NULL);
+  esp_data_ready_sem = osSemaphoreNew(1U, 0U, NULL);
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -217,8 +223,8 @@ int main(void)
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
-
   usart_rx_dma_queue = osMessageQueueNew(10, sizeof(uint16_t), NULL);
+  esp_messages_queue = osMessageQueueNew(10, sizeof(void*), NULL);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -232,7 +238,7 @@ int main(void)
 
   httpSendTaskHandle = osThreadNew(SendHTTPTask, NULL, &defaultTask_attributes);
 //  processHandle = osThreadNew(ProcessUartTask, NULL,  &defaultTask_attributes);
-  processHandle = osThreadNew(usart_rx_dma_thread, NULL, &defaultTask_attributes);
+  processHandle = osThreadNew(UsartRxReceiveTask, NULL, &defaultTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -607,40 +613,24 @@ void SelectorCycleTask(void* argument) {
 
 void SendHTTPTask(void* argument) {
 	uint32_t tick = osKernelGetTickCount();
+	void* d;
 
 	for(;;) {
-		tick += 3000U;
+		tick += 15000U;
 
-//		esp.send_cmd("AT+HTTPCLIENT=2,0,\"http://18.220.103.162:5050/api/v1/sensorCellData\",,,1");
-		esp.send_cmd("AT+GMR");
+		esp.flush();
+		esp.send_data_packet(data_packet);
+		osMessageQueueGet(esp_messages_queue, &d, NULL, osWaitForever);
 
-		// block until there's one semaphore available
-		osSemaphoreAcquire(esp_messages_sem, 5000);
-		std::string complete = "";
-		complete += esp.consume_message();
-
-		// now loop until we've cleared all pending messages
-		while (osSemaphoreGetCount(esp_messages_sem) > 0) {
-			osSemaphoreAcquire(esp_messages_sem, 5000);
-			complete += esp.consume_message();
-		}
-
-		logger.info(complete);
+		std::string esp_resp = esp.consume_message();
+		logger.info(esp_resp);
 
 		osDelayUntil(tick);
 	}
 }
 
-void ProcessUartTask(void* argument) {
-	uint8_t incoming_byte;
 
-	for(;;) {
-		osMessageQueueGet(mid_MsgQueue, &incoming_byte, NULL, osWaitForever);
-		esp.process_incoming_bytes((char*) &incoming_byte, 1);
-	}
-}
-
-void usart_rx_dma_thread(void* arg) {
+void UsartRxReceiveTask(void* arg) {
 	uint8_t d;
 
 	for(;;) {
