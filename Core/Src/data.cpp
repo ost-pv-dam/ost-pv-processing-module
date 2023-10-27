@@ -1,9 +1,8 @@
 #include "data.hpp"
 
-std::string DataPacket::serialize_json() {
-	std::ostringstream json;
+void DataPacket::serialize_json() {
 	json << "{";
-	json << get_json_key("timestamp") << timestamp << ","; // TODO: change backend to accept unix timestamp
+	json << get_json_key("timestamp") << timestamp << ",";
 	json << get_json_key("ambient_temp") << ambient_temp << ",";
 	json << get_json_key("humidity") << humidity << ",";
 	json << get_json_key("barometric_pressure") << barometric_pressure << ",";
@@ -43,5 +42,8 @@ std::string DataPacket::serialize_json() {
 	json << "}"; // cell_temperatures
 	json << "}"; // JSON object
 
-	return json.str();
+	serialized_json = json.str();
+
+	json.str("");
+	json.clear();
 }

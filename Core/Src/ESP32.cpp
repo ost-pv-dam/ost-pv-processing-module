@@ -1,10 +1,12 @@
 #include "ESP32.hpp"
 
-void ESP32::send_cmd(std::string cmd, bool crlf) {
-	if (crlf)
-		cmd += "\r\n";
-
-	HAL_UART_Transmit(&huart, (uint8_t*) cmd.c_str(), cmd.length(), 100);
+void ESP32::send_cmd(const std::string& cmd, bool crlf) {
+	if (crlf) {
+		std::string cmd_crlf = cmd + "\r\n";
+		HAL_UART_Transmit(&huart, (uint8_t*) cmd_crlf.c_str(), cmd_crlf.length(), 100);
+	} else {
+		HAL_UART_Transmit(&huart, (uint8_t*) cmd.c_str(), cmd.length(), 100);
+	}
 }
 
 int ESP32::init() {
@@ -78,6 +80,7 @@ std::string ESP32::poll(int num_bytes, uint32_t timeout) {
 }
 
 void ESP32::process_incoming_bytes(char* buf, int num_bytes) {
+//	Logger::getInstance()->direct(std::string(buf, num_bytes));
 	for (int i = 0; i < num_bytes; i++) {
 		current_message += buf[i];
 		if (current_message.length() >= ESP_OK.length() &&
@@ -89,19 +92,18 @@ void ESP32::process_incoming_bytes(char* buf, int num_bytes) {
 		} else if (current_message.length() >= ESP_READY.length() &&
 				current_message.substr(current_message.length() - ESP_READY.length(), ESP_READY.length()) == ESP_READY) {
 			osSemaphoreRelease(data_ready_sem);
+			current_message = "";
 		}
 	}
 }
 
 
 
-void ESP32::send_data_packet_start(std::string json) {
+void ESP32::send_data_packet_start(size_t json_length) {
 	std::ostringstream postCmd;
 
-	Logger::getInstance()->debug(json);
-
-	postCmd << "AT+HTTPCPOST=\"http://httpbin.org/post\",";
-	postCmd << json.length();
+	postCmd << "AT+HTTPCPOST=\"http://18.220.103.162:5050/api/v1/sensorCellData\",";
+	postCmd << json_length;
 	postCmd << ",2,\"connection: keep-alive\",\"content-type: application/json\"";
 
 	send_cmd(postCmd.str());

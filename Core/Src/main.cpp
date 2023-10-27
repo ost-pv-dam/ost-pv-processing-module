@@ -104,7 +104,7 @@ uint8_t esp_buf;
 char msg[100];
 float temp = 0.0f;
 float rh = 0.0f;
-uint8_t usart_rx_dma_buffer[256];
+uint8_t usart_rx_dma_buffer[512];
 
 
 
@@ -640,16 +640,25 @@ void SendHTTPTask(void* argument) {
 
 		esp.flush();
 
-		std::string json = data_packet.serialize_json();
-		esp.send_data_packet_start(json);
-
-		osSemaphoreAcquire(esp_data_ready_sem, osWaitForever);
-		esp.send_cmd(json, false);
-		osSemaphoreRelease(esp_data_ready_sem);
+		data_packet.serialize_json();
+		esp.send_data_packet_start(data_packet.serialized_json.length());
 
 		osMessageQueueGet(esp_messages_queue, &d, NULL, osWaitForever);
 
 		std::string esp_resp = esp.consume_message();
+		if (esp_resp.find(ESP_OK) == std::string::npos) {
+			logger.error("Unexpected HTTP start response: " + esp_resp);
+		}
+
+		osSemaphoreAcquire(esp_data_ready_sem, osWaitForever);
+		esp.send_cmd(data_packet.serialized_json, false);
+		osSemaphoreRelease(esp_data_ready_sem);
+
+		data_packet.serialized_json = ""; // free up memory
+
+		osMessageQueueGet(esp_messages_queue, &d, NULL, osWaitForever);
+
+		esp_resp = esp.consume_message();
 		logger.info(esp_resp);
 
 		osDelayUntil(tick);
@@ -658,7 +667,7 @@ void SendHTTPTask(void* argument) {
 
 
 void UsartRxReceiveTask(void* arg) {
-	uint8_t d;
+	uint16_t d;
 
 	for(;;) {
 		osMessageQueueGet(usart_rx_dma_queue, &d, NULL, osWaitForever);

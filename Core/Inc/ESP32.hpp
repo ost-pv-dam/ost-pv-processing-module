@@ -21,10 +21,10 @@ public:
 		huart(huart), external_queue(external_queue), data_ready_sem(data_ready_sem) {}
 
 	int init();
-	void send_cmd(std::string cmd, bool crlf = true);
+	void send_cmd(const std::string& cmd, bool crlf = true);
 	std::string poll(int num_bytes, uint32_t timeout = 100);
 
-	void send_data_packet_start(std::string json);
+	void send_data_packet_start(size_t json_length);
 
 	void process_incoming_bytes(char* buf, int num_bytes);
 	std::string consume_message();

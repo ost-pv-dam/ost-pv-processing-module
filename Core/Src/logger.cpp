@@ -24,3 +24,7 @@ void Logger::warn(std::string msg) {
 void Logger::error(std::string msg) {
 	log(LogLevel::Debug, "[ERROR] " + msg);
 }
+
+void Logger::direct(std::string msg) {
+	HAL_UART_Transmit(&huart, (uint8_t*) msg.c_str(), msg.length(), 2000);
+}

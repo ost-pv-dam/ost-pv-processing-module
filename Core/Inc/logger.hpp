@@ -21,6 +21,8 @@ public:
 	void warn(std::string msg);
 	void error(std::string msg);
 
+	void direct(std::string msg);
+
 	static void registerInstance(Logger* inst) {
 		instance = inst;
 	}

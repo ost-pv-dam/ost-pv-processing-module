@@ -31,9 +31,11 @@ struct DataPacket {
 	std::unordered_map<uint8_t, std::vector<CurrentVoltagePair>> iv_curves;
 	std::unordered_map<uint8_t, double> cell_temperatures;
 
-	std::string serialize_json();
+	void serialize_json();
+	std::string serialized_json;
 
 private:
+	std::ostringstream json;
 	static std::string get_json_key(std::string field) {
 		return "\"" + field + "\": ";
 	}
