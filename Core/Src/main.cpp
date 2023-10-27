@@ -229,6 +229,10 @@ int main(void)
   /* USER CODE BEGIN RTOS_QUEUES */
   usart_rx_dma_queue = osMessageQueueNew(10, sizeof(uint16_t), NULL);
   esp_messages_queue = osMessageQueueNew(10, sizeof(void*), NULL);
+
+  if (usart_rx_dma_queue == NULL || esp_messages_queue == NULL) {
+       logger.error("Queue creation failed"); // Message Queue object not created, handle failure
+  }
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -242,7 +246,7 @@ int main(void)
 
   const osThreadAttr_t httpTask_attributes = {
     .name = "httpTask",
-    .stack_size = 128 * 4,
+    .stack_size = 128 * 64,
     .priority = (osPriority_t) osPriorityLow,
   };
 
@@ -638,18 +642,17 @@ void SendHTTPTask(void* argument) {
 
 		std::string json = data_packet.serialize_json();
 		esp.send_data_packet_start(json);
-		osThreadYield();
 
-//		osSemaphoreAcquire(esp_data_ready_sem, osWaitForever);
-//		esp.send_cmd(json, false);
-//		osSemaphoreRelease(esp_data_ready_sem);
-//
-//		osMessageQueueGet(esp_messages_queue, &d, NULL, osWaitForever);
-//
-//		std::string esp_resp = esp.consume_message();
-//		logger.info(esp_resp);
-//
-//		osDelayUntil(tick);
+		osSemaphoreAcquire(esp_data_ready_sem, osWaitForever);
+		esp.send_cmd(json, false);
+		osSemaphoreRelease(esp_data_ready_sem);
+
+		osMessageQueueGet(esp_messages_queue, &d, NULL, osWaitForever);
+
+		std::string esp_resp = esp.consume_message();
+		logger.info(esp_resp);
+
+		osDelayUntil(tick);
 	}
 }
 
@@ -727,7 +730,8 @@ void usart_rx_check(uint16_t size) {
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-	osMessageQueuePut(usart_rx_dma_queue, &Size, 0, 0);
+	uint16_t msg = Size;
+	osMessageQueuePut(usart_rx_dma_queue, &msg, 0U, 0U);
 
 	/* start the DMA again */
 	HAL_UARTEx_ReceiveToIdle_DMA(&huart2, usart_rx_dma_buffer, ARRAY_LEN(usart_rx_dma_buffer));
