@@ -5,7 +5,11 @@ void ESP32::send_cmd(const std::string& cmd, bool crlf) {
 		std::string cmd_crlf = cmd + "\r\n";
 		HAL_UART_Transmit(&huart, (uint8_t*) cmd_crlf.c_str(), cmd_crlf.length(), 100);
 	} else {
-		HAL_UART_Transmit(&huart, (uint8_t*) cmd.c_str(), cmd.length(), 100);
+		if (cmd.length() > LONG_CMD_THRESHOLD) {
+			HAL_UART_Transmit(&huart, (uint8_t*) cmd.c_str(), cmd.length(), HAL_MAX_DELAY);
+		} else {
+			HAL_UART_Transmit(&huart, (uint8_t*) cmd.c_str(), cmd.length(), 100);
+		}
 	}
 }
 

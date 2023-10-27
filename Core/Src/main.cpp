@@ -75,6 +75,7 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
+
 /* RTOS */
 osThreadId_t selectorTaskHandle;
 osThreadId_t httpSendTaskHandle;
@@ -85,11 +86,14 @@ osMessageQueueId_t esp_messages_queue;
 
 osSemaphoreId_t esp_data_ready_sem;
 
+osMutexId_t data_packet_mutex;
+
 /* CONFIG */
 std::unordered_map<uint8_t, GPIOPortPin> panels = {
 		  {0, {GPIOD, GPIO_PIN_12}},
 		  {1, {GPIOD, GPIO_PIN_13}},
-		  {2, {GPIOD, GPIO_PIN_14}}
+		  {2, {GPIOD, GPIO_PIN_14}},
+		  {3, {GPIOD, GPIO_PIN_14}}
 };
 
 /* PERIPHERALS */
@@ -104,7 +108,7 @@ uint8_t esp_buf;
 char msg[100];
 float temp = 0.0f;
 float rh = 0.0f;
-uint8_t usart_rx_dma_buffer[512];
+uint8_t usart_rx_dma_buffer[64];
 
 
 
@@ -129,6 +133,7 @@ void SendHTTPTask(void* argument);
 void UsartRxReceiveTask(void* arg);
 
 void usart_rx_check(uint16_t size);
+void update_data();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -215,7 +220,15 @@ int main(void)
   osKernelInitialize();
 
   /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
+  const osMutexAttr_t DataPacket_Mutex_attr = {
+    "dataPacketMutex",                          // human readable mutex name
+    osMutexPrioInherit,    // attr_bits
+    NULL,                                     // memory for control block
+    0U                                        // size for control block
+  };
+
+//  data_packet_mutex = osMutexNew(&DataPacket_Mutex_attr);
+
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
@@ -634,18 +647,28 @@ void SelectorCycleTask(void* argument) {
 void SendHTTPTask(void* argument) {
 	uint32_t tick = osKernelGetTickCount();
 	void* d;
+	std::string esp_resp;
 
 	for(;;) {
-		tick += 15000U;
+		tick += 30000U;
+
+		//update_data();
 
 		esp.flush();
 
+//		esp.send_cmd("AT+SYSRAM?");
+//		osMessageQueueGet(esp_messages_queue, &d, NULL, osWaitForever);
+//		esp_resp = esp.consume_message();
+//		logger.info("ESP RAM: " + esp_resp);
+
 		data_packet.serialize_json();
+//		logger.debug(std::to_string(data_packet.serialized_json.length()));
+
 		esp.send_data_packet_start(data_packet.serialized_json.length());
 
 		osMessageQueueGet(esp_messages_queue, &d, NULL, osWaitForever);
 
-		std::string esp_resp = esp.consume_message();
+		esp_resp = esp.consume_message();
 		if (esp_resp.find(ESP_OK) == std::string::npos) {
 			logger.error("Unexpected HTTP start response: " + esp_resp);
 		}
@@ -731,11 +754,26 @@ void usart_rx_check(uint16_t size) {
     }
 }
 
-//extern "C" void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-//{
-//  osMessageQueuePut(mid_MsgQueue, &esp_buf, 0U, 0U);
-//  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
-//}
+void update_data() {
+
+	osMutexAcquire(data_packet_mutex, osWaitForever);
+
+	// TODO: replace with real sensor polling, will probably spawn off separate threads
+	data_packet.timestamp = 1698447075;
+	data_packet.ambient_temp = 70.23;
+	data_packet.barometric_pressure = 1000.53;
+	data_packet.humidity = 53.75;
+
+	for (auto& el : panels) {
+		data_packet.cell_temperatures[el.first] = el.first * 1.54;
+//		data_packet.iv_curves[el.first] = std::vector<CurrentVoltagePair>();
+//		for (size_t i = 0; i < 100; i++) {
+//			data_packet.iv_curves[el.first].push_back({i*0.34, i*3.75});
+//		}
+	}
+
+	osMutexRelease(data_packet_mutex);
+}
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {

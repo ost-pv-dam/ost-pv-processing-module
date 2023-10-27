@@ -12,6 +12,7 @@
 const std::string ESP_OK = "OK\r\n";
 const std::string ESP_WIFI_OK = "WIFI GOT IP\r\n";
 constexpr uint16_t ESP_RESP_LEN = 50;
+constexpr size_t LONG_CMD_THRESHOLD = 1000;
 const std::string ESP_API_HEADER = "x-api-key: test";
 const std::string ESP_READY = "\r\n>";
 
