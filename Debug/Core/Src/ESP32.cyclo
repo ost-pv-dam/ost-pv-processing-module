@@ -11,9 +11,9 @@
 ../Core/Src/ESP32.cpp:10:5:int ESP32::init()	7
 ../Core/Src/ESP32.cpp:71:13:std::string ESP32::poll(int, uint32_t)	3
 ../Core/Src/ESP32.cpp:80:6:void ESP32::process_incoming_bytes(char*, int)	10
-../Core/Src/ESP32.cpp:98:6:void ESP32::send_data_packet(DataPacket&)	1
-../Core/Src/ESP32.cpp:116:13:std::string ESP32::consume_message()	2
-../Core/Src/ESP32.cpp:126:6:void ESP32::flush()	1
+../Core/Src/ESP32.cpp:98:6:void ESP32::send_data_packet_start(std::string)	1
+../Core/Src/ESP32.cpp:110:13:std::string ESP32::consume_message()	2
+../Core/Src/ESP32.cpp:120:6:void ESP32::flush()	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/charconv.h:47:5:constexpr unsigned int std::__detail::__to_chars_len(_Tp, int) [with _Tp = unsigned int]	5
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/charconv.h:72:5:void std::__detail::__to_chars_10_impl(char*, unsigned int, _Tp) [with _Tp = unsigned int]	3
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_algobase.h:254:5:constexpr const _Tp& std::max(const _Tp&, const _Tp&) [with _Tp = unsigned int]	2
@@ -122,6 +122,6 @@
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_algobase.h:750:5:_BI2 std::__copy_move_backward_a2(_BI1, _BI1, _BI2) [with bool _IsMove = false; _BI1 = std::__cxx11::basic_string<char>**; _BI2 = std::__cxx11::basic_string<char>**]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_algobase.h:420:2:static _Tp* std::__copy_move<_IsMove, true, std::random_access_iterator_tag>::__copy_m(const _Tp*, const _Tp*, _Tp*) [with _Tp = std::__cxx11::basic_string<char>*; bool _IsMove = false]	2
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_algobase.h:731:2:static _Tp* std::__copy_move_backward<_IsMove, true, std::random_access_iterator_tag>::__copy_move_b(const _Tp*, const _Tp*, _Tp*) [with _Tp = std::__cxx11::basic_string<char>*; bool _IsMove = false]	2
-../Core/Src/ESP32.cpp:130:1:void __static_initialization_and_destruction_0(int, int)	5
-../Core/Src/ESP32.cpp:130:1:cpp)	1
-../Core/Src/ESP32.cpp:130:1:cpp)	1
+../Core/Src/ESP32.cpp:124:1:void __static_initialization_and_destruction_0(int, int)	5
+../Core/Src/ESP32.cpp:124:1:cpp)	1
+../Core/Src/ESP32.cpp:124:1:cpp)	1

@@ -95,9 +95,8 @@ void ESP32::process_incoming_bytes(char* buf, int num_bytes) {
 
 
 
-void ESP32::send_data_packet(DataPacket& data) {
+void ESP32::send_data_packet_start(std::string json) {
 	std::ostringstream postCmd;
-	std::string json = data.serialize_json();
 
 	Logger::getInstance()->debug(json);
 
@@ -106,11 +105,6 @@ void ESP32::send_data_packet(DataPacket& data) {
 	postCmd << ",2,\"connection: keep-alive\",\"content-type: application/json\"";
 
 	send_cmd(postCmd.str());
-
-	// NOTE: not sure how FreeRTOS will response to these functions being called from cpp, look here if things break
-	osSemaphoreAcquire(data_ready_sem, osWaitForever);
-	send_cmd(json, false);
-	osSemaphoreRelease(data_ready_sem);
 }
 
 std::string ESP32::consume_message() {

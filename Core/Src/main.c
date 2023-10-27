@@ -172,6 +172,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
+
   Logger::registerInstance(&logger);
   logger.debug("Init");
 
@@ -205,6 +206,9 @@ int main(void)
 #ifdef SELECTOR_D
   selector.deselect_all();
 #endif
+
+  HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(USART2_IRQn);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -236,9 +240,21 @@ int main(void)
   selectorTaskHandle = osThreadNew(SelectorCycleTask, NULL, &defaultTask_attributes);
 #endif
 
-  httpSendTaskHandle = osThreadNew(SendHTTPTask, NULL, &defaultTask_attributes);
+  const osThreadAttr_t httpTask_attributes = {
+    .name = "httpTask",
+    .stack_size = 128 * 4,
+    .priority = (osPriority_t) osPriorityLow,
+  };
+
+  const osThreadAttr_t processTask_attributes = {
+    .name = "processTask",
+    .stack_size = 128 * 4,
+    .priority = (osPriority_t) osPriorityHigh,
+  };
+
+  httpSendTaskHandle = osThreadNew(SendHTTPTask, NULL, &httpTask_attributes);
 //  processHandle = osThreadNew(ProcessUartTask, NULL,  &defaultTask_attributes);
-  processHandle = osThreadNew(UsartRxReceiveTask, NULL, &defaultTask_attributes);
+  processHandle = osThreadNew(UsartRxReceiveTask, NULL, &processTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -619,13 +635,21 @@ void SendHTTPTask(void* argument) {
 		tick += 15000U;
 
 		esp.flush();
-		esp.send_data_packet(data_packet);
-		osMessageQueueGet(esp_messages_queue, &d, NULL, osWaitForever);
 
-		std::string esp_resp = esp.consume_message();
-		logger.info(esp_resp);
+		std::string json = data_packet.serialize_json();
+		esp.send_data_packet_start(json);
+		osThreadYield();
 
-		osDelayUntil(tick);
+//		osSemaphoreAcquire(esp_data_ready_sem, osWaitForever);
+//		esp.send_cmd(json, false);
+//		osSemaphoreRelease(esp_data_ready_sem);
+//
+//		osMessageQueueGet(esp_messages_queue, &d, NULL, osWaitForever);
+//
+//		std::string esp_resp = esp.consume_message();
+//		logger.info(esp_resp);
+//
+//		osDelayUntil(tick);
 	}
 }
 

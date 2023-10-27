@@ -24,7 +24,7 @@ public:
 	void send_cmd(std::string cmd, bool crlf = true);
 	std::string poll(int num_bytes, uint32_t timeout = 100);
 
-	void send_data_packet(DataPacket& data);
+	void send_data_packet_start(std::string json);
 
 	void process_incoming_bytes(char* buf, int num_bytes);
 	std::string consume_message();
