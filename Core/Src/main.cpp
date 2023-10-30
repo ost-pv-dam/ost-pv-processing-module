@@ -632,7 +632,7 @@ void SendHTTPTask(void* argument) {
 	std::string esp_resp;
 
 	for(;;) {
-		tick += 30000U;
+		tick += 300000U; // 5 minutes
 
 		update_data();
 
@@ -666,7 +666,7 @@ void SendHTTPTask(void* argument) {
 		esp_resp = esp.consume_message();
 		logger.info(esp_resp);
 
-//		osDelayUntil(tick);
+		osDelayUntil(tick);
 	}
 }
 
