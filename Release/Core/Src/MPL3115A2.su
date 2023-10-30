@@ -1,0 +1,4 @@
+MPL3115A2.cpp:12:6:void configure_MPL3115A2(I2C_HandleTypeDef&)	32	static
+MPL3115A2.cpp:21:7:float read_baromateric_pressure(I2C_HandleTypeDef&)	32	static
+MPL3115A2.cpp:38:12:error_code i2c_write_register(I2C_HandleTypeDef&, uint32_t, uint8_t*, uint16_t)	32	static
+MPL3115A2.cpp:55:12:error_code i2c_read_register(I2C_HandleTypeDef&, uint32_t, uint8_t*, uint16_t)	24	static

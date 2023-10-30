@@ -38,7 +38,8 @@ Core/Src/main.o: ../Core/Src/main.cpp ../Core/Inc/main.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h \
- ../Core/Inc/MPL3115A2.h ../Core/Inc/solar_processing_structs.h
+ ../Core/Inc/MPL3115A2.h ../Core/Inc/solar_processing_structs.h \
+ ../Core/Inc/VC0706.h
 
 ../Core/Inc/main.h:
 
@@ -123,3 +124,5 @@ Core/Src/main.o: ../Core/Src/main.cpp ../Core/Inc/main.h \
 ../Core/Inc/MPL3115A2.h:
 
 ../Core/Inc/solar_processing_structs.h:
+
+../Core/Inc/VC0706.h:

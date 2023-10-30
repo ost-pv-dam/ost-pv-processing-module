@@ -1,0 +1,4 @@
+main.cpp:334:6:void StartDefaultTask(void*)	8	static
+main.cpp:173:6:void SystemClock_Config()	88	static,ignoring_inline_asm
+main.cpp:83:5:int main()	24	static,ignoring_inline_asm
+main.cpp:359:6:void Error_Handler()	0	static,ignoring_inline_asm

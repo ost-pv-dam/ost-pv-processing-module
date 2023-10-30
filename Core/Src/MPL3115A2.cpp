@@ -38,10 +38,10 @@ float read_baromateric_pressure(I2C_HandleTypeDef &i2c_device) {
 error_code i2c_write_register(I2C_HandleTypeDef &i2c_device, uint32_t reg_addr, uint8_t* data, uint16_t num_bytes) {
 	HAL_StatusTypeDef error;
 	if (num_bytes == 1) {
-		error = HAL_I2C_Mem_Write(&i2c_device, MPL3115A2_WRITE_ADDR << 1, reg_addr,
+		error = HAL_I2C_Mem_Write(&i2c_device, MPL3115A2_WRITE_ADDR, reg_addr,
 						          I2C_MEMADD_SIZE_8BIT, data, num_bytes, HAL_MAX_DELAY);
 	} else if (num_bytes == 2) {
-		error = HAL_I2C_Mem_Write(&i2c_device, MPL3115A2_WRITE_ADDR << 1, reg_addr,
+		error = HAL_I2C_Mem_Write(&i2c_device, MPL3115A2_WRITE_ADDR, reg_addr,
 						          I2C_MEMADD_SIZE_16BIT, data, num_bytes, HAL_MAX_DELAY);
 	} else {
 		return ERROR_INVALID_PARAMETER;

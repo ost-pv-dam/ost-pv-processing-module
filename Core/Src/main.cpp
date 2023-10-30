@@ -24,6 +24,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "MPL3115A2.h"
+#include "VC0706.h"
 #include "stdbool.h"
 #include "stdio.h"
 /* USER CODE END Includes */
@@ -46,7 +47,8 @@
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c2;
 
-UART_HandleTypeDef huart1;
+UART_HandleTypeDef huart4;
+extern UART_HandleTypeDef huart1;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -56,7 +58,7 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
-
+char msg[100];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -65,6 +67,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_UART4_Init(void);
 void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -107,15 +110,126 @@ int main(void)
   MX_USART1_UART_Init();
   MX_I2C2_Init();
   MX_I2C1_Init();
+  MX_UART4_Init();
   /* USER CODE BEGIN 2 */
-  bool found = false;
-  for (uint8_t address = 1; address <= 127; address++) {
-      HAL_StatusTypeDef result = HAL_I2C_IsDeviceReady(&hi2c1, address << 1, 1, HAL_MAX_DELAY);
-      if (result == HAL_OK) {
-    	  found = true;
-      }
-  }
+//  bool found = false;
+//  for (uint8_t address = 1; address <= 127; address++) {
+//      HAL_StatusTypeDef result = HAL_I2C_IsDeviceReady(&hi2c1, address << 1, 1, HAL_MAX_DELAY);
+//      if (result == HAL_OK) {
+//    	  found = true;
+//      }
+//  }
 
+  VC0706 camera(&huart4);
+  bool status = false;
+
+
+  HAL_Delay(3000);
+
+  status = camera.begin();
+
+  for (int i = 0; i < 100; i++) {
+      uint8_t element = camera.camera_buff[i];
+      char msg[20]; // Adjust the buffer size as needed
+      int msg_length;
+
+      // Use sprintf to format the message for the current element
+      msg_length = sprintf(msg, "Element %d: 0x%02X\n", i, element);
+
+      // Transmit the formatted message via UART
+      HAL_UART_Transmit(&huart1, (uint8_t*)msg, msg_length, 100);
+  }
+  sprintf(msg, "begin done \n\n");
+  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+
+  status = camera.set_image_size(VC0706_640x480);
+
+  for (int i = 0; i < 100; i++) {
+      uint8_t element = camera.camera_buff[i];
+      char msg[20]; // Adjust the buffer size as needed
+      int msg_length;
+
+      // Use sprintf to format the message for the current element
+      msg_length = sprintf(msg, "Element %d: 0x%02X\n", i, element);
+
+      // Transmit the formatted message via UART
+      HAL_UART_Transmit(&huart1, (uint8_t*)msg, msg_length, 100);
+  }
+  sprintf(msg, "set image size\n\n");
+  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+
+  HAL_Delay(1000);
+
+  uint8_t size = camera.get_image_size();
+
+  for (int i = 0; i < 100; i++) {
+      uint8_t element = camera.camera_buff[i];
+      char msg[20]; // Adjust the buffer size as needed
+      int msg_length;
+
+      // Use sprintf to format the message for the current element
+      msg_length = sprintf(msg, "Element %d: 0x%02X\n", i, element);
+
+      // Transmit the formatted message via UART
+      HAL_UART_Transmit(&huart1, (uint8_t*)msg, msg_length, 100);
+  }
+  sprintf(msg, "get img size\n\n");
+  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+
+  HAL_Delay(3000);
+
+  status = camera.take_picture();
+
+  for (int i = 0; i < 100; i++) {
+      uint8_t element = camera.camera_buff[i];
+      char msg[20]; // Adjust the buffer size as needed
+      int msg_length;
+
+      // Use sprintf to format the message for the current element
+      msg_length = sprintf(msg, "Element %d: 0x%02X\n", i, element);
+
+      // Transmit the formatted message via UART
+      HAL_UART_Transmit(&huart1, (uint8_t*)msg, msg_length, 100);
+  }
+  sprintf(msg, "take picture \n\n");
+  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+
+
+
+  uint32_t frame_size = camera.frameLength();
+  for (int i = 0; i < 100; i++) {
+      uint8_t element = camera.camera_buff[i];
+      char msg[20]; // Adjust the buffer size as needed
+      int msg_length;
+
+      // Use sprintf to format the message for the current element
+      msg_length = sprintf(msg, "Element %d: 0x%02X\n", i, element);
+
+      // Transmit the formatted message via UART
+      HAL_UART_Transmit(&huart1, (uint8_t*)msg, msg_length, 100);
+  }
+  sprintf(msg, "take picture \n\n");
+  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+
+
+
+  uint8_t* buff;
+
+  buff = camera.read_picture(32);
+
+  for (int i = 0; i < 100; i++) {
+      uint8_t element = camera.camera_buff[i];
+      char msg[20]; // Adjust the buffer size as needed
+      int msg_length;
+
+      // Use sprintf to format the message for the current element
+      msg_length = sprintf(msg, "Element %d: 0x%02X\n", i, element);
+
+      // Transmit the formatted message via UART
+      HAL_UART_Transmit(&huart1, (uint8_t*)msg, msg_length, 100);
+  }
+  sprintf(msg, "read picture \n\n");
+  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
 
   configure_MPL3115A2(hi2c1);
   /* USER CODE END 2 */
@@ -274,6 +388,39 @@ static void MX_I2C2_Init(void)
 }
 
 /**
+  * @brief UART4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_UART4_Init(void)
+{
+
+  /* USER CODE BEGIN UART4_Init 0 */
+
+  /* USER CODE END UART4_Init 0 */
+
+  /* USER CODE BEGIN UART4_Init 1 */
+
+  /* USER CODE END UART4_Init 1 */
+  huart4.Instance = UART4;
+  huart4.Init.BaudRate = 38400;
+  huart4.Init.WordLength = UART_WORDLENGTH_8B;
+  huart4.Init.StopBits = UART_STOPBITS_1;
+  huart4.Init.Parity = UART_PARITY_NONE;
+  huart4.Init.Mode = UART_MODE_TX_RX;
+  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN UART4_Init 2 */
+
+  /* USER CODE END UART4_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -315,8 +462,8 @@ static void MX_GPIO_Init(void)
 {
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
 }
 
