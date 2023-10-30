@@ -16,7 +16,7 @@ constexpr size_t LONG_CMD_THRESHOLD = 1000;
 const std::string ESP_API_HEADER = "x-api-key: test";
 constexpr const char* ESP_READY = "\r\n>";
 
-constexpr size_t ESP_MAX_RESP_LENGTH = 800; // probably good enough?
+constexpr size_t ESP_MAX_RESP_LENGTH = 64; // probably good enough?
 
 class ESP32 {
 public:
@@ -41,7 +41,7 @@ private:
 	UART_HandleTypeDef& huart;
 	std::queue<std::string> messages;
 
-	osMessageQueueId_t& external_queue;
+	osSemaphoreId_t& external_queue;
 	osSemaphoreId_t& data_ready_sem;
 };
 

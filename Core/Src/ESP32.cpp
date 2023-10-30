@@ -96,8 +96,7 @@ void ESP32::send_data_packet_start(size_t json_length) {
 
 void ESP32::push_message(std::string msg) {
 	messages.push(msg);
-	void* d = (void *)1;
-	osMessageQueuePut(external_queue, &d, 0, 0);
+	osSemaphoreRelease(external_queue);
 }
 
 std::string ESP32::consume_message() {

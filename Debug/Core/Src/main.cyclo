@@ -16,6 +16,9 @@
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_deque.h:96:3:constexpr std::size_t std::__deque_buf_size(std::size_t)	2
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_queue.h:96:11:std::queue<std::__cxx11::basic_string<char> >::~queue()	1
 ../Core/Inc/ESP32.hpp:23:2:ESP32::ESP32(UART_HandleTypeDef&, void*&, void*&)	1
+../Core/Inc/ESP32.hpp:36:22:UART_HandleTypeDef& ESP32::get_uart_handle()	1
+../Core/Inc/SMU.hpp:10:2:SMU::SMU(UART_HandleTypeDef&)	1
+../Core/Inc/SMU.hpp:14:22:UART_HandleTypeDef& SMU::get_uart_handle()	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/hashtable_policy.h:1210:7:std::__detail::_Hash_code_base<_Key, _Value, _ExtractKey, _Hash, _RangeHash, _Unused, __cache_hash_code>::_Hash_code_base() [with _Key = unsigned char; _Value = std::pair<const unsigned char, std::vector<CurrentVoltagePair> >; _ExtractKey = std::__detail::_Select1st; _Hash = std::hash<unsigned char>; _RangeHash = std::__detail::_Mod_range_hashing; _Unused = std::__detail::_Default_ranged_hash; bool __cache_hash_code = false]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/hashtable_policy.h:1604:7:std::__detail::_Hashtable_base<_Key, _Value, _ExtractKey, _Equal, _Hash, _RangeHash, _Unused, _Traits>::_Hashtable_base() [with _Key = unsigned char; _Value = std::pair<const unsigned char, std::vector<CurrentVoltagePair> >; _ExtractKey = std::__detail::_Select1st; _Equal = std::equal_to<unsigned char>; _Hash = std::hash<unsigned char>; _RangeHash = std::__detail::_Mod_range_hashing; _Unused = std::__detail::_Default_ranged_hash; _Traits = std::__detail::_Hashtable_traits<false, false, true>]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/hashtable_policy.h:1124:12:std::__detail::_Hashtable_ebo_helper<0, std::allocator<std::__detail::_Hash_node<std::pair<const unsigned char, std::vector<CurrentVoltagePair> >, false> >, true>::~_Hashtable_ebo_helper()	1
@@ -33,27 +36,25 @@
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/unordered_map.h:141:7:std::unordered_map<_Key, _Tp, _Hash, _Pred, _Alloc>::unordered_map() [with _Key = unsigned char; _Tp = double; _Hash = std::hash<unsigned char>; _Pred = std::equal_to<unsigned char>; _Alloc = std::allocator<std::pair<const unsigned char, double> >]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/unordered_map.h:102:11:std::unordered_map<unsigned char, double>::~unordered_map()	1
 ../Core/Inc/data.hpp:25:8:DataPacket::DataPacket()	1
-../Core/Src/main.cpp:147:5:int main()	3
-../Core/Src/main.cpp:299:6:void SystemClock_Config()	3
-../Core/Src/main.cpp:344:13:void MX_ADC1_Init()	3
-../Core/Src/main.cpp:394:13:void MX_I2C1_Init()	2
-../Core/Src/main.cpp:428:13:void MX_I2C2_Init()	2
-../Core/Src/main.cpp:462:13:void MX_SDIO_SD_Init()	3
-../Core/Src/main.cpp:498:13:void MX_USART1_UART_Init()	2
-../Core/Src/main.cpp:531:13:void MX_USART2_UART_Init()	2
-../Core/Src/main.cpp:564:13:void MX_USART3_UART_Init()	2
-../Core/Src/main.cpp:597:13:void MX_GPIO_Init()	1
-../Core/Src/main.cpp:620:6:void SelectorCycleTask(void*)	2
-../Core/Src/main.cpp:630:6:void SendHTTPTask(void*)	2
-../Core/Src/main.cpp:675:6:void EspUsartRxTask(void*)	1
-../Core/Src/main.cpp:683:6:void usart_process_data(const uint8_t*, size_t)	1
+../Core/Src/main.cpp:155:5:int main()	3
+../Core/Src/main.cpp:308:6:void SystemClock_Config()	3
+../Core/Src/main.cpp:353:13:void MX_ADC1_Init()	3
+../Core/Src/main.cpp:403:13:void MX_I2C1_Init()	2
+../Core/Src/main.cpp:437:13:void MX_I2C2_Init()	2
+../Core/Src/main.cpp:471:13:void MX_SDIO_SD_Init()	3
+../Core/Src/main.cpp:507:13:void MX_USART1_UART_Init()	2
+../Core/Src/main.cpp:540:13:void MX_USART2_UART_Init()	2
+../Core/Src/main.cpp:573:13:void MX_USART3_UART_Init()	2
+../Core/Src/main.cpp:606:13:void MX_GPIO_Init()	1
+../Core/Src/main.cpp:629:6:void ScheduledUpdateUploadTask(void*)	2
+../Core/Src/main.cpp:674:6:void EspUsartRxTask(void*)	2
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_vector.h:128:14:std::_Vector_base<CurrentVoltagePair, std::allocator<CurrentVoltagePair> >::_Vector_impl::~_Vector_impl()	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_vector.h:288:7:std::_Vector_base<_Tp, _Alloc>::_Vector_base() [with _Tp = CurrentVoltagePair; _Alloc = std::allocator<CurrentVoltagePair>]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_vector.h:487:7:std::vector<_Tp, _Alloc>::vector() [with _Tp = CurrentVoltagePair; _Alloc = std::allocator<CurrentVoltagePair>]	1
-../Core/Src/main.cpp:687:6:void update_data()	3
-../Core/Src/main.cpp:708:6:void HAL_UART_RxCpltCallback(UART_HandleTypeDef*)	7
-../Core/Src/main.cpp:738:6:void StartDefaultTask(void*)	1
-../Core/Src/main.cpp:753:6:void Error_Handler()	1
+../Core/Src/main.cpp:693:6:void update_data()	3
+../Core/Src/main.cpp:714:6:void HAL_UART_RxCpltCallback(UART_HandleTypeDef*)	12
+../Core/Src/main.cpp:776:6:void StartDefaultTask(void*)	1
+../Core/Src/main.cpp:791:6:void Error_Handler()	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/charconv.h:47:5:constexpr unsigned int std::__detail::__to_chars_len(_Tp, int) [with _Tp = unsigned int]	5
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/charconv.h:72:5:void std::__detail::__to_chars_10_impl(char*, unsigned int, _Tp) [with _Tp = unsigned int]	3
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_algobase.h:254:5:constexpr const _Tp& std::max(const _Tp&, const _Tp&) [with _Tp = unsigned int]	2
@@ -76,12 +77,12 @@
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/hashtable_policy.h:1127:7:std::__detail::_Hashtable_ebo_helper<_Nm, _Tp, true>::_Hashtable_ebo_helper() [with int _Nm = 0; _Tp = std::allocator<std::__detail::_Hash_node<std::pair<const unsigned char, double>, false> >]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/allocator.h:174:7:std::allocator< <template-parameter-1-1> >::~allocator() [with _Tp = std::__detail::_Hash_node<std::pair<const unsigned char, double>, false>]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/hashtable.h:1528:5:std::_Hashtable<_Key, _Value, _Alloc, _ExtractKey, _Equal, _Hash, _RangeHash, _Unused, _RehashPolicy, _Traits>::~_Hashtable() [with _Key = unsigned char; _Value = std::pair<const unsigned char, double>; _Alloc = std::allocator<std::pair<const unsigned char, double> >; _ExtractKey = std::__detail::_Select1st; _Equal = std::equal_to<unsigned char>; _Hash = std::hash<unsigned char>; _RangeHash = std::__detail::_Mod_range_hashing; _Unused = std::__detail::_Default_ranged_hash; _RehashPolicy = std::__detail::_Prime_rehash_policy; _Traits = std::__detail::_Hashtable_traits<false, false, true>]	1
+/Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/move.h:49:5:constexpr _Tp* std::__addressof(_Tp&) [with _Tp = std::__cxx11::basic_string<char>]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/unordered_map.h:325:7:std::unordered_map<_Key, _Tp, _Hash, _Pred, _Alloc>::iterator std::unordered_map<_Key, _Tp, _Hash, _Pred, _Alloc>::begin() [with _Key = unsigned char; _Tp = GPIOPortPin; _Hash = std::hash<unsigned char>; _Pred = std::equal_to<unsigned char>; _Alloc = std::allocator<std::pair<const unsigned char, GPIOPortPin> >]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/unordered_map.h:347:7:std::unordered_map<_Key, _Tp, _Hash, _Pred, _Alloc>::iterator std::unordered_map<_Key, _Tp, _Hash, _Pred, _Alloc>::end() [with _Key = unsigned char; _Tp = GPIOPortPin; _Hash = std::hash<unsigned char>; _Pred = std::equal_to<unsigned char>; _Alloc = std::allocator<std::pair<const unsigned char, GPIOPortPin> >]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/hashtable_policy.h:309:7:bool std::__detail::operator!=(const std::__detail::_Node_iterator_base<std::pair<const unsigned char, GPIOPortPin>, false>&, const std::__detail::_Node_iterator_base<std::pair<const unsigned char, GPIOPortPin>, false>&)	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/hashtable_policy.h:350:7:std::__detail::_Node_iterator<_Value, __constant_iterators, __cache>& std::__detail::_Node_iterator<_Value, __constant_iterators, __cache>::operator++() [with _Value = std::pair<const unsigned char, GPIOPortPin>; bool __constant_iterators = false; bool __cache = false]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/hashtable_policy.h:342:7:std::__detail::_Node_iterator<_Value, __constant_iterators, __cache>::reference std::__detail::_Node_iterator<_Value, __constant_iterators, __cache>::operator*() const [with _Value = std::pair<const unsigned char, GPIOPortPin>; bool __constant_iterators = false; bool __cache = false]	1
-/Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/move.h:49:5:constexpr _Tp* std::__addressof(_Tp&) [with _Tp = std::__cxx11::basic_string<char>]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/unordered_map.h:979:7:std::unordered_map<_Key, _Tp, _Hash, _Pred, _Alloc>::mapped_type& std::unordered_map<_Key, _Tp, _Hash, _Pred, _Alloc>::operator[](const key_type&) [with _Key = unsigned char; _Tp = double; _Hash = std::hash<unsigned char>; _Pred = std::equal_to<unsigned char>; _Alloc = std::allocator<std::pair<const unsigned char, double> >]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/unordered_map.h:979:7:std::unordered_map<_Key, _Tp, _Hash, _Pred, _Alloc>::mapped_type& std::unordered_map<_Key, _Tp, _Hash, _Pred, _Alloc>::operator[](const key_type&) [with _Key = unsigned char; _Tp = std::vector<CurrentVoltagePair>; _Hash = std::hash<unsigned char>; _Pred = std::equal_to<unsigned char>; _Alloc = std::allocator<std::pair<const unsigned char, std::vector<CurrentVoltagePair> > >]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_vector.h:131:2:std::_Vector_base<_Tp, _Alloc>::_Vector_impl::_Vector_impl() [with _Tp = CurrentVoltagePair; _Alloc = std::allocator<CurrentVoltagePair>]	1
@@ -488,6 +489,6 @@
 ../Core/Inc/ESP32.hpp:21:7:ESP32::~ESP32()	1
 ../Core/Inc/selector.hpp:14:7:Selector::~Selector()	1
 ../Core/Inc/logger.hpp:14:7:Logger::~Logger()	1
-../Core/Src/main.cpp:762:1:void __static_initialization_and_destruction_0(int, int)	5
-../Core/Src/main.cpp:762:1:cpp)	1
-../Core/Src/main.cpp:762:1:cpp)	1
+../Core/Src/main.cpp:800:1:void __static_initialization_and_destruction_0(int, int)	5
+../Core/Src/main.cpp:800:1:cpp)	1
+../Core/Src/main.cpp:800:1:cpp)	1

@@ -17,7 +17,6 @@ public:
 
 private:
 	UART_HandleTypeDef& huart;
-	osSemaphoreId_t& data_packet_sem;
 };
 
 #endif // SMU_H
