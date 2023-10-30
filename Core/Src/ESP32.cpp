@@ -83,25 +83,6 @@ std::string ESP32::poll(int num_bytes, uint32_t timeout) {
 	return ret;
 }
 
-void ESP32::process_incoming_bytes(char* buf, int num_bytes) {
-//	Logger::getInstance()->direct(std::string(buf, num_bytes));
-	for (int i = 0; i < num_bytes; i++) {
-		current_message += buf[i];
-		if (current_message.length() >= ESP_OK.length() &&
-				current_message.substr(current_message.length() - ESP_OK.length(), ESP_OK.length()) == ESP_OK) {
-			messages.push(current_message);
-			void* d = (void *)1;
-			osMessageQueuePut(external_queue, &d, 0, 0);
-			current_message = "";
-		} else if (current_message.length() >= ESP_READY.length() &&
-				current_message.substr(current_message.length() - ESP_READY.length(), ESP_READY.length()) == ESP_READY) {
-			osSemaphoreRelease(data_ready_sem);
-			current_message = "";
-		}
-	}
-}
-
-
 
 void ESP32::send_data_packet_start(size_t json_length) {
 	std::ostringstream postCmd;
@@ -111,6 +92,12 @@ void ESP32::send_data_packet_start(size_t json_length) {
 	postCmd << ",2,\"connection: keep-alive\",\"content-type: application/json\"";
 
 	send_cmd(postCmd.str());
+}
+
+void ESP32::push_message(std::string msg) {
+	messages.push(msg);
+	void* d = (void *)1;
+	osMessageQueuePut(external_queue, &d, 0, 0);
 }
 
 std::string ESP32::consume_message() {
@@ -126,5 +113,4 @@ std::string ESP32::consume_message() {
 void ESP32::flush() {
 	osMessageQueueReset(external_queue);
 	std::queue<std::string>().swap(messages);
-	current_message = "";
 }

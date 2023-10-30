@@ -65,7 +65,6 @@ SD_HandleTypeDef hsd;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
-DMA_HandleTypeDef hdma_usart2_rx;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -81,10 +80,11 @@ osThreadId_t selectorTaskHandle;
 osThreadId_t httpSendTaskHandle;
 osThreadId_t processHandle;
 
-osMessageQueueId_t usart_rx_dma_queue;
+
 osMessageQueueId_t esp_messages_queue;
 
 osSemaphoreId_t esp_data_ready_sem;
+osSemaphoreId_t esp_rx_complete_sem;
 
 osMutexId_t data_packet_mutex;
 
@@ -108,16 +108,15 @@ uint8_t esp_buf;
 char msg[100];
 float temp = 0.0f;
 float rh = 0.0f;
-uint8_t usart_rx_dma_buffer[64];
 
-
+size_t esp_usart_pos = 0;
+uint8_t esp_usart_rx_buffer[ESP_MAX_RESP_LENGTH];
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_DMA_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_ADC1_Init(void);
@@ -168,12 +167,11 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DMA_Init();
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   MX_ADC1_Init();
   MX_I2C2_Init();
-//  MX_SDIO_SD_Init();
+  //MX_SDIO_SD_Init();
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
@@ -233,6 +231,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   esp_data_ready_sem = osSemaphoreNew(1U, 0U, NULL);
+  esp_rx_complete_sem = osSemaphoreNew(1U, 0U, NULL);
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -240,10 +239,9 @@ int main(void)
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  usart_rx_dma_queue = osMessageQueueNew(10, sizeof(uint16_t), NULL);
   esp_messages_queue = osMessageQueueNew(10, sizeof(void*), NULL);
 
-  if (usart_rx_dma_queue == NULL || esp_messages_queue == NULL) {
+  if (esp_messages_queue == NULL) {
        logger.error("Queue creation failed"); // Message Queue object not created, handle failure
   }
   /* USER CODE END RTOS_QUEUES */
@@ -591,22 +589,6 @@ static void MX_USART3_UART_Init(void)
 }
 
 /**
-  * Enable DMA controller clock
-  */
-static void MX_DMA_Init(void)
-{
-
-  /* DMA controller clock enable */
-  __HAL_RCC_DMA1_CLK_ENABLE();
-
-  /* DMA interrupt init */
-  /* DMA1_Stream5_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
-
-}
-
-/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -652,7 +634,7 @@ void SendHTTPTask(void* argument) {
 	for(;;) {
 		tick += 30000U;
 
-		//update_data();
+		update_data();
 
 		esp.flush();
 
@@ -662,7 +644,7 @@ void SendHTTPTask(void* argument) {
 //		logger.info("ESP RAM: " + esp_resp);
 
 		data_packet.serialize_json();
-//		logger.debug(std::to_string(data_packet.serialized_json.length()));
+		logger.debug(std::to_string(data_packet.serialized_json.length()));
 
 		esp.send_data_packet_start(data_packet.serialized_json.length());
 
@@ -684,74 +666,21 @@ void SendHTTPTask(void* argument) {
 		esp_resp = esp.consume_message();
 		logger.info(esp_resp);
 
-		osDelayUntil(tick);
+//		osDelayUntil(tick);
 	}
 }
 
 
 void UsartRxReceiveTask(void* arg) {
-	uint16_t d;
-
 	for(;;) {
-		osMessageQueueGet(usart_rx_dma_queue, &d, NULL, osWaitForever);
-
-		usart_rx_check(d);
+		osSemaphoreAcquire(esp_rx_complete_sem, osWaitForever);
+		esp.push_message(std::string((char*) esp_usart_rx_buffer, esp_usart_pos));
+		esp_usart_pos = 0;
 	}
 }
 
 void usart_process_data(const uint8_t* data, size_t len) {
-    esp.process_incoming_bytes((char*) data, len);
-}
-
-void usart_rx_check(uint16_t size) {
-    static size_t old_pos = 0;
-    size_t pos;
-
-    /* Calculate current position in buffer and check for new data available */
-    pos = ARRAY_LEN(usart_rx_dma_buffer) - size;
-    if (pos != old_pos) {                       /* Check change in received data */
-        if (pos > old_pos) {                    /* Current position is over previous one */
-            /*
-             * Processing is done in "linear" mode.
-             *
-             * Application processing is fast with single data block,
-             * length is simply calculated by subtracting pointers
-             *
-             * [   0   ]
-             * [   1   ] <- old_pos |------------------------------------|
-             * [   2   ]            |                                    |
-             * [   3   ]            | Single block (len = pos - old_pos) |
-             * [   4   ]            |                                    |
-             * [   5   ]            |------------------------------------|
-             * [   6   ] <- pos
-             * [   7   ]
-             * [ N - 1 ]
-             */
-            usart_process_data(&usart_rx_dma_buffer[old_pos], pos - old_pos);
-        } else {
-            /*
-             * Processing is done in "overflow" mode..
-             *
-             * Application must process data twice,
-             * since there are 2 linear memory blocks to handle
-             *
-             * [   0   ]            |---------------------------------|
-             * [   1   ]            | Second block (len = pos)        |
-             * [   2   ]            |---------------------------------|
-             * [   3   ] <- pos
-             * [   4   ] <- old_pos |---------------------------------|
-             * [   5   ]            |                                 |
-             * [   6   ]            | First block (len = N - old_pos) |
-             * [   7   ]            |                                 |
-             * [ N - 1 ]            |---------------------------------|
-             */
-            usart_process_data(&usart_rx_dma_buffer[old_pos], ARRAY_LEN(usart_rx_dma_buffer) - old_pos);
-            if (pos > 0) {
-                usart_process_data(&usart_rx_dma_buffer[0], pos);
-            }
-        }
-        old_pos = pos;                          /* Save current position as old for next transfers */
-    }
+    esp.push_message(std::string((char*) data, len));
 }
 
 void update_data() {
@@ -766,22 +695,34 @@ void update_data() {
 
 	for (auto& el : panels) {
 		data_packet.cell_temperatures[el.first] = el.first * 1.54;
-//		data_packet.iv_curves[el.first] = std::vector<CurrentVoltagePair>();
-//		for (size_t i = 0; i < 100; i++) {
-//			data_packet.iv_curves[el.first].push_back({i*0.34, i*3.75});
-//		}
+		data_packet.iv_curves[el.first] = std::vector<CurrentVoltagePair>();
+		for (size_t i = 0; i < 100; i++) {
+			data_packet.iv_curves[el.first].push_back({i*0.34, i*3.75});
+		}
 	}
 
 	osMutexRelease(data_packet_mutex);
 }
 
-void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
-{
-	uint16_t msg = Size;
-	osMessageQueuePut(usart_rx_dma_queue, &msg, 0U, 0U);
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	// short circuit to avoid unnecessary strncmp() calls
+	if ((esp_usart_rx_buffer[esp_usart_pos] == '\n' &&
+			!strncmp((char*) &esp_usart_rx_buffer[esp_usart_pos-3], ESP_OK, 4)) ||
+			esp_usart_pos == ESP_MAX_RESP_LENGTH-1) {
+		osSemaphoreRelease(esp_rx_complete_sem);
 
-	/* start the DMA again */
-	HAL_UARTEx_ReceiveToIdle_DMA(&huart2, usart_rx_dma_buffer, ARRAY_LEN(usart_rx_dma_buffer));
+	} else if (esp_usart_rx_buffer[esp_usart_pos] == '>' &&
+			!strncmp((char*) &esp_usart_rx_buffer[esp_usart_pos-2], ESP_READY, 3)) {
+		osSemaphoreRelease(esp_data_ready_sem);
+	}
+
+	if (esp_usart_pos == ESP_MAX_RESP_LENGTH-1) {
+		esp_usart_pos = 0;
+	} else {
+		++esp_usart_pos;
+	}
+
+	HAL_UART_Receive_IT(&huart2, &esp_usart_rx_buffer[esp_usart_pos], 1);
 }
 
 /* USER CODE END 4 */
@@ -798,7 +739,7 @@ void StartDefaultTask(void *argument)
   /* USER CODE BEGIN 5 */
   for (;;) {
 //	  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
-	  HAL_UARTEx_ReceiveToIdle_DMA(&huart2, usart_rx_dma_buffer, ARRAY_LEN(usart_rx_dma_buffer));
+	  HAL_UART_Receive_IT(&huart2, &esp_usart_rx_buffer[esp_usart_pos], 1);
 	  osThreadSuspend(defaultTaskHandle);
   }
   /* USER CODE END 5 */

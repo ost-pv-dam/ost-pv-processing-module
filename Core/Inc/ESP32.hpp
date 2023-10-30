@@ -9,12 +9,14 @@
 #include "logger.hpp"
 #include <sstream>
 
-const std::string ESP_OK = "OK\r\n";
+constexpr const char* ESP_OK = "OK\r\n";
 const std::string ESP_WIFI_OK = "WIFI GOT IP\r\n";
 constexpr uint16_t ESP_RESP_LEN = 50;
 constexpr size_t LONG_CMD_THRESHOLD = 1000;
 const std::string ESP_API_HEADER = "x-api-key: test";
-const std::string ESP_READY = "\r\n>";
+constexpr const char* ESP_READY = "\r\n>";
+
+constexpr size_t ESP_MAX_RESP_LENGTH = 800; // probably good enough?
 
 class ESP32 {
 public:
@@ -27,14 +29,12 @@ public:
 
 	void send_data_packet_start(size_t json_length);
 
-	void process_incoming_bytes(char* buf, int num_bytes);
+	void push_message(std::string msg);
 	std::string consume_message();
 	void flush();
 
 private:
 	UART_HandleTypeDef& huart;
-
-	std::string current_message = "";
 	std::queue<std::string> messages;
 
 	osMessageQueueId_t& external_queue;
