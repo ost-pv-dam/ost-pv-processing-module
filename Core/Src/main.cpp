@@ -23,9 +23,16 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <SHT30.hpp>
-#include <selector.hpp>
 #include "stdio.h"
+#include "string.h"
+#include <string>
+#include <sstream>
+
+#include "SHT30.hpp"
+#include "selector.hpp"
+#include "logger.hpp"
+#include "ESP32.hpp"
+#include "data.hpp"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -36,7 +43,10 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 //#define SHT30_D
-#define SELECTOR_D
+//#define SELECTOR_D
+#define ESP32_D
+
+#define ARRAY_LEN(x)            (sizeof(x) / sizeof((x)[0]))
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -60,25 +70,48 @@ UART_HandleTypeDef huart3;
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 128 * 8,
+  .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
+
+/* RTOS */
+osThreadId_t selectorTaskHandle;
+osThreadId_t httpSendTaskHandle;
+osThreadId_t processHandle;
+
+
+osMessageQueueId_t esp_messages_queue;
+
+osSemaphoreId_t esp_data_ready_sem;
+osSemaphoreId_t esp_rx_complete_sem;
+
+osMutexId_t data_packet_mutex;
+
+/* CONFIG */
 std::unordered_map<uint8_t, GPIOPortPin> panels = {
 		  {0, {GPIOD, GPIO_PIN_12}},
 		  {1, {GPIOD, GPIO_PIN_13}},
-		  {2, {GPIOD, GPIO_PIN_14}}
+		  {2, {GPIOD, GPIO_PIN_14}},
+		  {3, {GPIOD, GPIO_PIN_14}}
 };
 
+/* PERIPHERALS */
+Logger logger(huart1, LogLevel::Debug);
 SHT30_t sht = { .hi2c = &hi2c1 };
 Selector selector(panels);
+ESP32 esp(huart2, esp_messages_queue, esp_data_ready_sem);
 
-
+/* BUFFERS */
+DataPacket data_packet;
+uint8_t esp_buf;
 char msg[100];
 float temp = 0.0f;
 float rh = 0.0f;
 
-osThreadId_t selectorTaskHandle;
+size_t esp_usart_pos = 0;
+uint8_t esp_usart_rx_buffer[ESP_MAX_RESP_LENGTH];
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -95,6 +128,11 @@ void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 void SelectorCycleTask(void* argument);
+void SendHTTPTask(void* argument);
+void UsartRxReceiveTask(void* arg);
+
+void usart_rx_check(uint16_t size);
+void update_data();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -133,11 +171,28 @@ int main(void)
   MX_USART1_UART_Init();
   MX_ADC1_Init();
   MX_I2C2_Init();
-//  MX_SDIO_SD_Init();
+  //MX_SDIO_SD_Init();
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
-  sprintf(msg, "Init\n");
+
+  Logger::registerInstance(&logger);
+  logger.debug("Init");
+
+
+#ifdef ESP32_D
+  HAL_Delay(500); // allow ESP to finish any commands from before reset
+  if (!esp.init()) {
+	  logger.error("ESP32 init FAIL!");
+  } else {
+	  logger.info("ESP32 init SUCCESS");
+  }
+
+  HAL_Delay(500);
+//  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
+
+#endif
+
 
 #ifdef SHT30_D
   HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
@@ -154,17 +209,29 @@ int main(void)
 #ifdef SELECTOR_D
   selector.deselect_all();
 #endif
+
+  HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(USART2_IRQn);
   /* USER CODE END 2 */
 
   /* Init scheduler */
   osKernelInitialize();
 
   /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
+  const osMutexAttr_t DataPacket_Mutex_attr = {
+    "dataPacketMutex",                          // human readable mutex name
+    osMutexPrioInherit,    // attr_bits
+    NULL,                                     // memory for control block
+    0U                                        // size for control block
+  };
+
+//  data_packet_mutex = osMutexNew(&DataPacket_Mutex_attr);
+
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
+  esp_data_ready_sem = osSemaphoreNew(1U, 0U, NULL);
+  esp_rx_complete_sem = osSemaphoreNew(1U, 0U, NULL);
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -172,7 +239,11 @@ int main(void)
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
+  esp_messages_queue = osMessageQueueNew(10, sizeof(void*), NULL);
+
+  if (esp_messages_queue == NULL) {
+       logger.error("Queue creation failed"); // Message Queue object not created, handle failure
+  }
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -183,6 +254,22 @@ int main(void)
 #ifdef SELECTOR_D
   selectorTaskHandle = osThreadNew(SelectorCycleTask, NULL, &defaultTask_attributes);
 #endif
+
+  const osThreadAttr_t httpTask_attributes = {
+    .name = "httpTask",
+    .stack_size = 128 * 64,
+    .priority = (osPriority_t) osPriorityLow,
+  };
+
+  const osThreadAttr_t processTask_attributes = {
+    .name = "processTask",
+    .stack_size = 128 * 4,
+    .priority = (osPriority_t) osPriorityHigh,
+  };
+
+  httpSendTaskHandle = osThreadNew(SendHTTPTask, NULL, &httpTask_attributes);
+//  processHandle = osThreadNew(ProcessUartTask, NULL,  &defaultTask_attributes);
+  processHandle = osThreadNew(UsartRxReceiveTask, NULL, &processTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -456,7 +543,7 @@ static void MX_USART2_UART_Init(void)
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
   huart2.Init.Mode = UART_MODE_TX_RX;
-  huart2.Init.HwFlowCtl = UART_HWCONTROL_RTS_CTS;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart2.Init.OverSampling = UART_OVERSAMPLING_16;
   if (HAL_UART_Init(&huart2) != HAL_OK)
   {
@@ -539,6 +626,105 @@ void SelectorCycleTask(void* argument) {
 	}
 }
 
+void SendHTTPTask(void* argument) {
+	uint32_t tick = osKernelGetTickCount();
+	void* d;
+	std::string esp_resp;
+
+	for(;;) {
+		tick += 300000U; // 5 minutes
+
+		update_data();
+
+		esp.flush();
+
+//		esp.send_cmd("AT+SYSRAM?");
+//		osMessageQueueGet(esp_messages_queue, &d, NULL, osWaitForever);
+//		esp_resp = esp.consume_message();
+//		logger.info("ESP RAM: " + esp_resp);
+
+		data_packet.serialize_json();
+		logger.debug(std::to_string(data_packet.serialized_json.length()));
+
+		esp.send_data_packet_start(data_packet.serialized_json.length());
+
+		osMessageQueueGet(esp_messages_queue, &d, NULL, osWaitForever);
+
+		esp_resp = esp.consume_message();
+		if (esp_resp.find(ESP_OK) == std::string::npos) {
+			logger.error("Unexpected HTTP start response: " + esp_resp);
+		}
+
+		osSemaphoreAcquire(esp_data_ready_sem, osWaitForever);
+		esp.send_cmd(data_packet.serialized_json, false);
+		osSemaphoreRelease(esp_data_ready_sem);
+
+		data_packet.serialized_json = ""; // free up memory
+
+		osMessageQueueGet(esp_messages_queue, &d, NULL, osWaitForever);
+
+		esp_resp = esp.consume_message();
+		logger.info(esp_resp);
+
+		osDelayUntil(tick);
+	}
+}
+
+
+void UsartRxReceiveTask(void* arg) {
+	for(;;) {
+		osSemaphoreAcquire(esp_rx_complete_sem, osWaitForever);
+		esp.push_message(std::string((char*) esp_usart_rx_buffer, esp_usart_pos));
+		esp_usart_pos = 0;
+	}
+}
+
+void usart_process_data(const uint8_t* data, size_t len) {
+    esp.push_message(std::string((char*) data, len));
+}
+
+void update_data() {
+
+	osMutexAcquire(data_packet_mutex, osWaitForever);
+
+	// TODO: replace with real sensor polling, will probably spawn off separate threads
+	data_packet.timestamp = 1698447075;
+	data_packet.ambient_temp = 70.23;
+	data_packet.barometric_pressure = 1000.53;
+	data_packet.humidity = 53.75;
+
+	for (auto& el : panels) {
+		data_packet.cell_temperatures[el.first] = el.first * 1.54;
+		data_packet.iv_curves[el.first] = std::vector<CurrentVoltagePair>();
+		for (size_t i = 0; i < 100; i++) {
+			data_packet.iv_curves[el.first].push_back({i*0.34, i*3.75});
+		}
+	}
+
+	osMutexRelease(data_packet_mutex);
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	// short circuit to avoid unnecessary strncmp() calls
+	if ((esp_usart_rx_buffer[esp_usart_pos] == '\n' &&
+			!strncmp((char*) &esp_usart_rx_buffer[esp_usart_pos-3], ESP_OK, 4)) ||
+			esp_usart_pos == ESP_MAX_RESP_LENGTH-1) {
+		osSemaphoreRelease(esp_rx_complete_sem);
+
+	} else if (esp_usart_rx_buffer[esp_usart_pos] == '>' &&
+			!strncmp((char*) &esp_usart_rx_buffer[esp_usart_pos-2], ESP_READY, 3)) {
+		osSemaphoreRelease(esp_data_ready_sem);
+	}
+
+	if (esp_usart_pos == ESP_MAX_RESP_LENGTH-1) {
+		esp_usart_pos = 0;
+	} else {
+		++esp_usart_pos;
+	}
+
+	HAL_UART_Receive_IT(&huart2, &esp_usart_rx_buffer[esp_usart_pos], 1);
+}
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -551,13 +737,10 @@ void SelectorCycleTask(void* argument) {
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  /* Infinite loop */
-  for(;;)
-  {
-	SHT30_read_temp_humidity(&sht, &temp, &rh);
-	sprintf(msg, "temp: %.2f, rh: %.2f\n", temp, rh);
-	HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
-    osDelay(4000);
+  for (;;) {
+//	  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
+	  HAL_UART_Receive_IT(&huart2, &esp_usart_rx_buffer[esp_usart_pos], 1);
+	  osThreadSuspend(defaultTaskHandle);
   }
   /* USER CODE END 5 */
 }
