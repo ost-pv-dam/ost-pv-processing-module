@@ -33,6 +33,10 @@ public:
 	std::string consume_message();
 	void flush();
 
+	UART_HandleTypeDef& get_uart_handle() {
+		return huart;
+	}
+
 private:
 	UART_HandleTypeDef& huart;
 	std::queue<std::string> messages;

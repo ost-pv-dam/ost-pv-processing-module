@@ -33,6 +33,7 @@
 #include "logger.hpp"
 #include "ESP32.hpp"
 #include "data.hpp"
+#include "SMU.hpp"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -101,6 +102,7 @@ Logger logger(huart1, LogLevel::Debug);
 SHT30_t sht = { .hi2c = &hi2c1 };
 Selector selector(panels);
 ESP32 esp(huart2, esp_messages_queue, esp_data_ready_sem);
+SMU smu(huart3);
 
 /* BUFFERS */
 DataPacket data_packet;
@@ -128,10 +130,12 @@ void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 void SelectorCycleTask(void* argument);
-void SendHTTPTask(void* argument);
-void UsartRxReceiveTask(void* arg);
+void ScheduledUpdateUploadTask(void* argument);
+void RequestedUpdateUploadTask(void* argument);
 
-void usart_rx_check(uint16_t size);
+void EspUsartRxTask(void* arg);
+void SmuUsartRxTask(void* arg);
+
 void update_data();
 /* USER CODE END PFP */
 
@@ -267,9 +271,9 @@ int main(void)
     .priority = (osPriority_t) osPriorityHigh,
   };
 
-  httpSendTaskHandle = osThreadNew(SendHTTPTask, NULL, &httpTask_attributes);
+  httpSendTaskHandle = osThreadNew(ScheduledUpdateUploadTask, NULL, &httpTask_attributes);
 //  processHandle = osThreadNew(ProcessUartTask, NULL,  &defaultTask_attributes);
-  processHandle = osThreadNew(UsartRxReceiveTask, NULL, &processTask_attributes);
+  processHandle = osThreadNew(EspUsartRxTask, NULL, &processTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -626,13 +630,13 @@ void SelectorCycleTask(void* argument) {
 	}
 }
 
-void SendHTTPTask(void* argument) {
+void ScheduledUpdateUploadTask(void* argument) {
 	uint32_t tick = osKernelGetTickCount();
 	void* d;
 	std::string esp_resp;
 
 	for(;;) {
-		tick += 300000U; // 5 minutes
+		tick += 900000U; // 15 minutes
 
 		update_data();
 
@@ -671,7 +675,7 @@ void SendHTTPTask(void* argument) {
 }
 
 
-void UsartRxReceiveTask(void* arg) {
+void EspUsartRxTask(void* arg) {
 	for(;;) {
 		osSemaphoreAcquire(esp_rx_complete_sem, osWaitForever);
 		esp.push_message(std::string((char*) esp_usart_rx_buffer, esp_usart_pos));
@@ -705,24 +709,28 @@ void update_data() {
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-	// short circuit to avoid unnecessary strncmp() calls
-	if ((esp_usart_rx_buffer[esp_usart_pos] == '\n' &&
-			!strncmp((char*) &esp_usart_rx_buffer[esp_usart_pos-3], ESP_OK, 4)) ||
-			esp_usart_pos == ESP_MAX_RESP_LENGTH-1) {
-		osSemaphoreRelease(esp_rx_complete_sem);
+	if (huart == &esp.get_uart_handle()) {
+		// short circuit to avoid unnecessary strncmp() calls
+		if ((esp_usart_rx_buffer[esp_usart_pos] == '\n' &&
+				!strncmp((char*) &esp_usart_rx_buffer[esp_usart_pos-3], ESP_OK, 4)) ||
+				esp_usart_pos == ESP_MAX_RESP_LENGTH-1) {
+			osSemaphoreRelease(esp_rx_complete_sem);
 
-	} else if (esp_usart_rx_buffer[esp_usart_pos] == '>' &&
-			!strncmp((char*) &esp_usart_rx_buffer[esp_usart_pos-2], ESP_READY, 3)) {
-		osSemaphoreRelease(esp_data_ready_sem);
+		} else if (esp_usart_rx_buffer[esp_usart_pos] == '>' &&
+				!strncmp((char*) &esp_usart_rx_buffer[esp_usart_pos-2], ESP_READY, 3)) {
+			osSemaphoreRelease(esp_data_ready_sem);
+		}
+
+		if (esp_usart_pos == ESP_MAX_RESP_LENGTH-1) {
+			esp_usart_pos = 0;
+		} else {
+			++esp_usart_pos;
+		}
+
+		HAL_UART_Receive_IT(&huart2, &esp_usart_rx_buffer[esp_usart_pos], 1);
+	} else if (huart == &smu.get_uart_handle()) {
+
 	}
-
-	if (esp_usart_pos == ESP_MAX_RESP_LENGTH-1) {
-		esp_usart_pos = 0;
-	} else {
-		++esp_usart_pos;
-	}
-
-	HAL_UART_Receive_IT(&huart2, &esp_usart_rx_buffer[esp_usart_pos], 1);
 }
 
 /* USER CODE END 4 */
