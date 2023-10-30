@@ -49,6 +49,7 @@ struct BufferRange {
 //#define SHT30_D
 //#define SELECTOR_D
 #define ESP32_D
+#define SHT30_D
 
 #define ARRAY_LEN(x)            (sizeof(x) / sizeof((x)[0]))
 /* USER CODE END PD */
@@ -101,7 +102,7 @@ std::unordered_map<uint8_t, GPIOPortPin> panels = {
 
 /* PERIPHERALS */
 Logger logger(huart1, LogLevel::Debug);
-SHT30_t sht = { .hi2c = &hi2c1 };
+SHT30 sht(hi2c1);
 Selector selector(panels);
 ESP32 esp(huart2, esp_messages_sem, esp_data_ready_sem);
 SMU smu(huart3);
@@ -205,14 +206,12 @@ int main(void)
 
 #ifdef SHT30_D
   HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
-  if (!SHT30_init(&sht)) {
-	  sprintf(msg, "SHT30 init FAIL\n");
-	  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+  if (!sht.init()) {
+	  logger.error("SHT30 init FAIL");
 	  return 0;
   }
 
-  sprintf(msg, "SHT30 init OK\n");
-  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+  logger.info("SHT30 init OK");
 #endif
 
 #ifdef SELECTOR_D
@@ -631,8 +630,7 @@ void ScheduledUpdateUploadTask(void* argument) {
 	std::string esp_resp;
 
 	for(;;) {
-//		tick += 900000U; // 15 minutes
-		tick += 5000U;
+		tick += 900000U; // 15 minutes
 
 		update_data();
 
@@ -695,9 +693,16 @@ void update_data() {
 
 	// TODO: replace with real sensor polling, will probably spawn off separate threads
 	data_packet.timestamp = 1698447075;
-	data_packet.ambient_temp = 70.23;
+
 	data_packet.barometric_pressure = 1000.53;
+
+#ifdef SHT30_D
+	sht.read_temp_humidity(data_packet.ambient_temp, data_packet.humidity);
+	logger.info("Temp: " + std::to_string(data_packet.ambient_temp) + " Humid: " + std::to_string(data_packet.humidity));
+#else
+	data_packet.ambient_temp = 70.23;
 	data_packet.humidity = 53.75;
+#endif
 
 	for (auto& el : panels) {
 		data_packet.cell_temperatures[el.first] = el.first * 1.54;

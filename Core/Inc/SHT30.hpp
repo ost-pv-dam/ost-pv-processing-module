@@ -5,17 +5,21 @@
 #include <stdint.h>
 #include <assert.h>
 
-#define SHT30_I2C_ADDR 0x44
-#define SHT30_I2C_TIMEOUT 30
-#define SHT30_COMMAND_MEASURE_HIGHREP_STRETCH 0x2c06
-#define SHT30_COMMAND_READ_STATUS 0xf32d
+constexpr uint16_t SHT30_I2C_ADDR = 0x44;
+constexpr uint16_t  SHT30_I2C_TIMEOUT = 30;
+constexpr uint16_t SHT30_COMMAND_MEASURE_HIGHREP_STRETCH = 0x2c06;
+constexpr uint16_t SHT30_COMMAND_READ_STATUS = 0xf32d;
 
-typedef struct SHT30_t {
-	I2C_HandleTypeDef* hi2c;
-} SHT30_t;
+class SHT30 {
+public:
+	SHT30(I2C_HandleTypeDef& hi2c) : hi2c(hi2c) {}
 
-uint8_t SHT30_init(SHT30_t* sht);
-uint8_t SHT30_send_cmd(SHT30_t* sht, uint16_t cmd);
-uint8_t SHT30_read_temp_humidity(SHT30_t* sht, float* temperature, float* humidity);
+	bool init();
+	bool send_cmd(uint16_t cmd);
+	bool read_temp_humidity(double& temperature, double& humidity);
+
+private:
+	I2C_HandleTypeDef& hi2c;
+};
 
 #endif // SHT30_H
