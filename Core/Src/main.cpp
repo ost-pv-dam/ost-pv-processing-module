@@ -78,7 +78,7 @@ UART_HandleTypeDef huart3;
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 128 * 16,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
@@ -320,10 +320,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.LSEState = RCC_LSE_BYPASS;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 16;
@@ -348,7 +348,7 @@ void SystemClock_Config(void)
     Error_Handler();
   }
   PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_RTC;
-  PeriphClkInitStruct.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
+  PeriphClkInitStruct.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -680,10 +680,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
-  __HAL_RCC_GPIOC_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOD, Panel0_Pin|Panel1_Pin|Panel2_Pin, GPIO_PIN_RESET);
@@ -703,7 +703,8 @@ void ScheduledUpdateUploadTask(void* argument) {
 	std::string esp_resp;
 
 	for(;;) {
-		tick += 900000U; // 15 minutes
+//		tick += 900000U; // 15 minutes
+		tick += 300000U; // 5 minutes
 
 		update_data();
 
@@ -715,7 +716,7 @@ void ScheduledUpdateUploadTask(void* argument) {
 //		logger.info("ESP RAM: " + esp_resp);
 
 		data_packet.serialize_json();
-		logger.debug(std::to_string(data_packet.serialized_json.length()));
+		logger.debug("JSON length: " + std::to_string(data_packet.serialized_json.length()));
 
 		esp.send_data_packet_start(data_packet.serialized_json.length());
 
@@ -734,7 +735,7 @@ void ScheduledUpdateUploadTask(void* argument) {
 
 		osSemaphoreAcquire(esp_messages_sem, osWaitForever);
 		esp_resp = esp.consume_message();
-		logger.info(esp_resp);
+		logger.debug(esp_resp);
 
 		osDelayUntil(tick);
 	}
@@ -765,7 +766,7 @@ void update_data() {
 
 	// TODO: replace with real sensor polling, will probably spawn off separate threads
 	data_packet.timestamp = rtc.get_current_timestamp();
-	logger.info(std::to_string(data_packet.timestamp));
+	logger.info("Capture timestamp: " + std::to_string(data_packet.timestamp));
 
 	data_packet.barometric_pressure = 1000.53;
 
@@ -862,7 +863,9 @@ void StartDefaultTask(void *argument)
 	  std::string time_resp = esp.consume_message();
 
 	  if (!rtc.parse_and_sync(time_resp)) {
-		  logger.error("Unable to sync clock");
+		  logger.warn("Unable to sync clock, using battery backup...");
+	  } else {
+		  logger.info("RTC synchronized to " + std::to_string(rtc.get_current_timestamp()));
 	  }
 
 	  httpSendTaskHandle = osThreadNew(ScheduledUpdateUploadTask, NULL, &httpTask_attributes);

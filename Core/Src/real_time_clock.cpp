@@ -11,7 +11,7 @@ bool RealTimeClock::parse_and_sync(std::string time_resp) {
 	int data_size = stoi(time_resp.substr(resp_pos+12, next_delim));
 	size_t end_valid_data = next_delim + data_size;
 
-	Logger::getInstance()->info(time_resp.substr(next_delim+1, end_valid_data));
+	Logger::getInstance()->debug(time_resp.substr(next_delim+1, end_valid_data));
 	size_t prev_delim = next_delim;
 	std::vector<int> datetime;
 
@@ -53,7 +53,6 @@ bool RealTimeClock::parse_and_sync(std::string time_resp) {
 	}
 
 	HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1, 0x32F2); // look into what this does
-
 	return true;
 }
 
