@@ -12,11 +12,12 @@
 #include <unordered_map>
 #include <vector>
 #include <sstream>
+#include <string>
 
 /* measured cell voltage for the supplied current */
 struct CurrentVoltagePair {
-	double voltage;
-	double current;
+	std::string voltage;
+	std::string current;
 };
 
 

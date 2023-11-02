@@ -51,6 +51,7 @@ struct BufferRange {
 //#define SELECTOR_D
 #define ESP32_D
 #define SHT30_D
+#define SMU_D
 
 #define ARRAY_LEN(x)            (sizeof(x) / sizeof((x)[0]))
 /* USER CODE END PD */
@@ -87,8 +88,10 @@ const osThreadAttr_t defaultTask_attributes = {
 osThreadId_t selectorTaskHandle;
 osThreadId_t httpSendTaskHandle;
 osThreadId_t processHandle;
+osThreadId_t smuProcessHandle;
 
 osMessageQueueId_t esp_msg_rx_queue;
+osMessageQueueId_t smu_msg_rx_queue;
 
 osSemaphoreId_t esp_data_ready_sem;
 osSemaphoreId_t esp_messages_sem;
@@ -118,12 +121,14 @@ char msg[100];
 float temp = 0.0f;
 float rh = 0.0f;
 BufferRange esp_buffer_range = {0,0};
+BufferRange smu_buffer_range = {0,0};
 
 size_t esp_usart_pos = 0;
 uint8_t esp_usart_rx_buffer[ESP_MAX_RESP_LENGTH];
 
+uint8_t curr_cell_idx = 0;
 size_t smu_usart_pos = 0;
-uint8_t smu_usart_rx_buffer[ESP_MAX_RESP_LENGTH]; // TODO: change size
+uint8_t smu_usart_rx_buffer[SMU_MAX_RESP_LENGTH]; // TODO: change size
 
 /* USER CODE END PV */
 
@@ -224,6 +229,11 @@ int main(void)
   selector.deselect_all();
 #endif
 
+#ifdef SMU_D
+  //TODO: maybe add some type of checking to see if this worked
+  smu.init_voltage_sweep();
+#endif
+
   HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(USART2_IRQn);
   /* USER CODE END 2 */
@@ -256,7 +266,12 @@ int main(void)
   esp_msg_rx_queue = osMessageQueueNew(10U, sizeof(BufferRange), NULL);
 
   if (esp_msg_rx_queue == NULL) {
-       logger.error("Queue creation failed"); // Message Queue object not created, handle failure
+       logger.error("ESP queue creation failed"); // Message Queue object not created, handle failure
+  }
+
+  smu_msg_rx_queue = osMessageQueueNew(10U, sizeof(BufferRange), NULL);
+  if (smu_msg_rx_queue == NULL) {
+       logger.error("SMU queue creation failed"); // Message Queue object not created, handle failure
   }
   /* USER CODE END RTOS_QUEUES */
 
@@ -282,8 +297,9 @@ int main(void)
   };
 
   httpSendTaskHandle = osThreadNew(ScheduledUpdateUploadTask, NULL, &httpTask_attributes);
-//  processHandle = osThreadNew(ProcessUartTask, NULL,  &defaultTask_attributes);
   processHandle = osThreadNew(EspUsartRxTask, NULL, &processTask_attributes);
+  smuProcessHandle = osThreadNew(SmuUsartRxTask, NULL, &processTask_attributes);
+
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -761,6 +777,43 @@ void EspUsartRxTask(void* arg) {
 	}
 }
 
+void SmuUsartRxTask(void* arg) {
+	BufferRange buffer_range;
+
+	for(;;) {
+		osMessageQueueGet(smu_msg_rx_queue, &buffer_range, NULL, osWaitForever);
+
+		if (buffer_range.start <= buffer_range.end) {
+			// assuming the queue contains strings following "current,voltage"
+            std::string data_str((char*)&esp_usart_rx_buffer[buffer_range.start],
+                buffer_range.end + 1 - buffer_range.start);
+
+            // find the position of the comma
+            size_t comma_pos = data_str.find(',');
+
+            if (comma_pos != std::string::npos) {
+                // extract the current and voltage substrings
+                std::string current = data_str.substr(0, comma_pos);
+                std::string voltage = data_str.substr(comma_pos + 1);
+
+                // create a CurrentVoltagePair using the current and voltage values
+                CurrentVoltagePair pair;
+                pair.current = current;
+                pair.voltage = voltage;
+
+                // push the CurrentVoltagePair to your data structure
+                data_packet.iv_curves[curr_cell_idx].push_back(pair);
+
+                //TODO: decide where to increment "curr_cell_idx"
+            }
+		} else {
+			// not sure how we want to handle this case
+			// i can think of a way to minimize this from incomplete data from even being put into the queue potentially
+
+		}
+	}
+}
+
 void update_data() {
 
 	osMutexAcquire(data_packet_mutex, osWaitForever);
@@ -782,7 +835,7 @@ void update_data() {
 		data_packet.cell_temperatures[el.first] = el.first * 1.54;
 		data_packet.iv_curves[el.first] = std::vector<CurrentVoltagePair>();
 		for (size_t i = 0; i < 100; i++) {
-			data_packet.iv_curves[el.first].push_back({i*0.34, i*3.75});
+//			data_packet.iv_curves[el.first].push_back({i*0.34, i*3.75});
 		}
 	}
 
@@ -838,7 +891,33 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 		HAL_UART_Receive_IT(&esp.get_uart_handle(), &esp_usart_rx_buffer[esp_usart_pos], 1);
 	} else if (huart == &smu.get_uart_handle()) {
+        static BufferRange smu_buffer_range;
+        static bool isValCurrent = true;
 
+        // TODO: add some error detection for this (identifying bad packets)
+        // this is all assuming data is a constant stream of "current,voltage,current,voltage," etc.
+        if (isValCurrent && smu_usart_rx_buffer[smu_usart_pos] == ',') {
+        	// we got the first value (current), now get next value (voltage)
+        	isValCurrent = false;
+        } else if (!isValCurrent && smu_usart_rx_buffer[smu_usart_pos] == ',') {
+            // when a comma is found again, we know this is the end of the voltage reading
+            smu_buffer_range.end = smu_usart_pos;
+
+            // put "current,voltage" pair (the start and end indicies) in the queue
+            osMessageQueuePut(smu_msg_rx_queue, &smu_buffer_range, 0U, 0U);
+
+            // the next current val will start one position after this voltage value
+            isValCurrent = true;
+            smu_buffer_range.end = smu_usart_pos + 1;
+        }
+
+        if (smu_usart_pos == SMU_MAX_RESP_LENGTH - 1) {
+            smu_usart_pos = 0;
+        } else {
+            ++smu_usart_pos;
+        }
+
+        HAL_UART_Receive_IT(&smu.get_uart_handle(), &smu_usart_rx_buffer[smu_usart_pos], 1);
 	}
 }
 
