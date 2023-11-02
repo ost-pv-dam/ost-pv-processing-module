@@ -15,8 +15,8 @@
 
 /* measured cell voltage for the supplied current */
 struct CurrentVoltagePair {
-	double voltage;
-	double current;
+	std::string current;
+	std::string voltage;
 };
 
 

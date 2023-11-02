@@ -51,6 +51,7 @@ struct BufferRange {
 //#define SELECTOR_D
 #define ESP32_D
 #define SHT30_D
+#define SMU_D
 
 #define ARRAY_LEN(x)            (sizeof(x) / sizeof((x)[0]))
 /* USER CODE END PD */
@@ -93,11 +94,16 @@ const osThreadAttr_t httpTask_attributes = {
 osThreadId_t selectorTaskHandle;
 osThreadId_t httpSendTaskHandle;
 osThreadId_t processHandle;
+osThreadId_t smuProcessHandle;
 
 osMessageQueueId_t esp_msg_rx_queue;
+osMessageQueueId_t smu_data_rx_queue;
+
 
 osSemaphoreId_t esp_data_ready_sem;
 osSemaphoreId_t esp_messages_sem;
+
+osSemaphoreId_t smu_done_sem;
 
 osMutexId_t data_packet_mutex;
 
@@ -129,7 +135,8 @@ size_t esp_usart_pos = 0;
 uint8_t esp_usart_rx_buffer[ESP_MAX_RESP_LENGTH];
 
 size_t smu_usart_pos = 0;
-uint8_t smu_usart_rx_buffer[ESP_MAX_RESP_LENGTH]; // TODO: change size
+uint8_t smu_usart_rx_buffer[SMU_BUFFER_LENGTH];
+uint8_t curr_cell_id = 0;
 
 /* USER CODE END PV */
 
@@ -230,8 +237,15 @@ int main(void)
   selector.deselect_all();
 #endif
 
+#ifdef SMU_D
+  smu.config_voltage_sweep();
+#endif
+
   HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(USART2_IRQn);
+
+  HAL_NVIC_SetPriority(USART3_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(USART3_IRQn);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -252,6 +266,7 @@ int main(void)
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   esp_messages_sem = osSemaphoreNew(10U, 0U, NULL);
   esp_data_ready_sem = osSemaphoreNew(1U, 0U, NULL);
+  smu_done_sem = osSemaphoreNew(1U, 0U, NULL);
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -260,6 +275,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_QUEUES */
   esp_msg_rx_queue = osMessageQueueNew(10U, sizeof(BufferRange), NULL);
+  smu_data_rx_queue = osMessageQueueNew(100U, sizeof(BufferRange), NULL);
 
   if (esp_msg_rx_queue == NULL) {
        logger.error("Queue creation failed"); // Message Queue object not created, handle failure
@@ -280,8 +296,18 @@ int main(void)
     .stack_size = 128 * 4,
     .priority = (osPriority_t) osPriorityHigh,
   };
-//  processHandle = osThreadNew(ProcessUartTask, NULL,  &defaultTask_attributes);
+
   processHandle = osThreadNew(EspUsartRxTask, NULL, &processTask_attributes);
+
+  const osThreadAttr_t smu_processTask_attributes = {
+      .name = "processTask",
+      .stack_size = 128 * 16,
+      .priority = (osPriority_t) osPriorityHigh,
+  };
+
+  smuProcessHandle = osThreadNew(SmuUsartRxTask, NULL, &smu_processTask_attributes);
+
+
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -653,7 +679,7 @@ static void MX_USART3_UART_Init(void)
 
   /* USER CODE END USART3_Init 1 */
   huart3.Instance = USART3;
-  huart3.Init.BaudRate = 115200;
+  huart3.Init.BaudRate = 9600;
   huart3.Init.WordLength = UART_WORDLENGTH_8B;
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
@@ -760,6 +786,48 @@ void EspUsartRxTask(void* arg) {
 	}
 }
 
+void SmuUsartRxTask(void* arg) {
+	BufferRange buffer_range;
+
+	for(;;) {
+		osMessageQueueGet(smu_data_rx_queue, &buffer_range, NULL, osWaitForever);
+		std::string data_str;
+
+		if (buffer_range.start <= buffer_range.end) {
+			data_str = std::string((char*)&smu_usart_rx_buffer[buffer_range.start],
+				buffer_range.end + 1 - buffer_range.start);
+		} else {
+			// the buffer wrapped around
+			data_str = std::string((char*) &smu_usart_rx_buffer[buffer_range.start],
+								SMU_BUFFER_LENGTH - buffer_range.start);
+
+			data_str += std::string((char*) &smu_usart_rx_buffer[0], buffer_range.end+1);
+		}
+
+		logger.debug(data_str);
+
+		// find the position of the comma
+		size_t comma_pos = data_str.find(',');
+
+		if (comma_pos != std::string::npos) {
+			// extract the current and voltage substrings
+			std::string current = data_str.substr(0, comma_pos);
+			std::string voltage = data_str.substr(comma_pos + 1);
+
+			// create a CurrentVoltagePair using the current and voltage values
+			CurrentVoltagePair pair {current, voltage};
+
+			// push the CurrentVoltagePair to your data structure
+			data_packet.iv_curves[curr_cell_id].push_back(pair);
+			if (data_packet.iv_curves[curr_cell_id].size() == 8) {
+				osSemaphoreRelease(smu_done_sem);
+			}
+		} else {
+			logger.error("Invalid SMU data sent to rx thread: " + data_str);
+		}
+	}
+}
+
 void update_data() {
 
 	osMutexAcquire(data_packet_mutex, osWaitForever);
@@ -778,13 +846,19 @@ void update_data() {
 	data_packet.humidity = 53.75;
 #endif
 
+#ifdef SMU_D
+	smu.run_voltage_sweep();
+	osSemaphoreAcquire(smu_done_sem, osWaitForever);
+
+#else
 	for (auto& el : panels) {
 		data_packet.cell_temperatures[el.first] = el.first * 1.54;
 		data_packet.iv_curves[el.first] = std::vector<CurrentVoltagePair>();
 		for (size_t i = 0; i < 100; i++) {
-			data_packet.iv_curves[el.first].push_back({i*0.34, i*3.75});
+			data_packet.iv_curves[el.first].push_back({std::to_string(i*0.34), std::to_string(i*3.75)});
 		}
 	}
+#endif
 
 	osMutexRelease(data_packet_mutex);
 }
@@ -838,9 +912,36 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 		HAL_UART_Receive_IT(&esp.get_uart_handle(), &esp_usart_rx_buffer[esp_usart_pos], 1);
 	} else if (huart == &smu.get_uart_handle()) {
+		static BufferRange smu_buffer_range = {0, 0};
+		static bool isValCurrent = true;
 
+		// TODO: add some error detection for this (identifying bad packets)
+		// this is all assuming data is a constant stream of "current,voltage,current,voltage," etc.
+		if (isValCurrent && smu_usart_rx_buffer[smu_usart_pos] == ',') {
+			// we got the first value (current), now get next value (voltage)
+			isValCurrent = false;
+		} else if (!isValCurrent && smu_usart_rx_buffer[smu_usart_pos] == ',') {
+			// when a comma is found again, we know this is the end of the voltage reading
+			smu_buffer_range.end = smu_usart_pos-1; // don't include comma
+
+			// put "current,voltage" pair (the start and end indices) in the queue
+			osMessageQueuePut(smu_data_rx_queue, &smu_buffer_range, 0U, 0U);
+
+			// the next current val will start one position after this voltage value
+			isValCurrent = true;
+			smu_buffer_range.start = smu_usart_pos + 1;
+		}
+
+		if (smu_usart_pos == SMU_BUFFER_LENGTH - 1) {
+			smu_usart_pos = 0;
+		} else {
+			++smu_usart_pos;
+		}
+
+		HAL_UART_Receive_IT(&smu.get_uart_handle(), &smu_usart_rx_buffer[smu_usart_pos], 1);
 	}
 }
+
 
 /* USER CODE END 4 */
 
@@ -856,6 +957,7 @@ void StartDefaultTask(void *argument)
   /* USER CODE BEGIN 5 */
   for (;;) {
 	  HAL_UART_Receive_IT(&huart2, &esp_usart_rx_buffer[esp_usart_pos], 1);
+	  HAL_UART_Receive_IT(&huart3, &smu_usart_rx_buffer[smu_usart_pos], 1);
 
 	  // sync RTC
 	  esp.send_cmd("AT+HTTPCLIENT=2,0,\"http://18.220.103.162:5050/api/v1/sensorCellData/getCurrentTime\",,,1");

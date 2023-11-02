@@ -52,7 +52,7 @@ bool RealTimeClock::parse_and_sync(std::string time_resp) {
 		return false;
 	}
 
-	HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1, 0x32F2); // look into what this does
+//	HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1, 0x32F2); // look into what this does
 	return true;
 }
 
