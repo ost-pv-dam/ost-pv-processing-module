@@ -34,7 +34,7 @@
 #include "ESP32.hpp"
 #include "data.hpp"
 #include "SMU.hpp"
-#include "Clock.hpp"
+#include "real_time_clock.hpp"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -78,12 +78,18 @@ UART_HandleTypeDef huart3;
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 16,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
 
 /* RTOS */
+const osThreadAttr_t httpTask_attributes = {
+    .name = "httpTask",
+    .stack_size = 128 * 64,
+    .priority = (osPriority_t) osPriorityLow,
+};
+
 osThreadId_t selectorTaskHandle;
 osThreadId_t httpSendTaskHandle;
 osThreadId_t processHandle;
@@ -109,7 +115,7 @@ SHT30 sht(hi2c1);
 Selector selector(panels);
 ESP32 esp(huart2, esp_messages_sem, esp_data_ready_sem);
 SMU smu(huart3);
-Clock clock(hrtc);
+RealTimeClock rtc(hrtc);
 
 /* BUFFERS */
 DataPacket data_packet;
@@ -269,19 +275,11 @@ int main(void)
   selectorTaskHandle = osThreadNew(SelectorCycleTask, NULL, &defaultTask_attributes);
 #endif
 
-  const osThreadAttr_t httpTask_attributes = {
-    .name = "httpTask",
-    .stack_size = 128 * 64,
-    .priority = (osPriority_t) osPriorityLow,
-  };
-
   const osThreadAttr_t processTask_attributes = {
     .name = "processTask",
     .stack_size = 128 * 4,
     .priority = (osPriority_t) osPriorityHigh,
   };
-
-  httpSendTaskHandle = osThreadNew(ScheduledUpdateUploadTask, NULL, &httpTask_attributes);
 //  processHandle = osThreadNew(ProcessUartTask, NULL,  &defaultTask_attributes);
   processHandle = osThreadNew(EspUsartRxTask, NULL, &processTask_attributes);
   /* USER CODE END RTOS_THREADS */
@@ -766,7 +764,8 @@ void update_data() {
 	osMutexAcquire(data_packet_mutex, osWaitForever);
 
 	// TODO: replace with real sensor polling, will probably spawn off separate threads
-	data_packet.timestamp = 1698447075;
+	data_packet.timestamp = rtc.get_current_timestamp();
+	logger.info(std::to_string(data_packet.timestamp));
 
 	data_packet.barometric_pressure = 1000.53;
 
@@ -858,14 +857,15 @@ void StartDefaultTask(void *argument)
 	  HAL_UART_Receive_IT(&huart2, &esp_usart_rx_buffer[esp_usart_pos], 1);
 
 	  // sync RTC
-	  esp.send_cmd("AT+HTTPCLIENT=2,0,\"http://18.220.103.162:5050/api/v1/getCurrentTime\",,,1");
-	  osSemaphoreAcquire(esp_messages_sem);
+	  esp.send_cmd("AT+HTTPCLIENT=2,0,\"http://18.220.103.162:5050/api/v1/sensorCellData/getCurrentTime\",,,1");
+	  osSemaphoreAcquire(esp_messages_sem, osWaitForever);
 	  std::string time_resp = esp.consume_message();
 
-	  if (!clock.parse_and_sync(time_resp)) {
+	  if (!rtc.parse_and_sync(time_resp)) {
 		  logger.error("Unable to sync clock");
 	  }
 
+	  httpSendTaskHandle = osThreadNew(ScheduledUpdateUploadTask, NULL, &httpTask_attributes);
 	  osThreadSuspend(defaultTaskHandle);
   }
   /* USER CODE END 5 */
