@@ -15,6 +15,7 @@ void SMU::config_voltage_sweep() {
 	send_scpi(":SOUR:VOLT:STOP 6");
 	send_scpi(":SOUR:VOLT:STEP 1");
 	send_scpi(":TRIG:COUNT 8");
+	send_scpi(":FORM:ELEM CURR, VOLT");
 }
 
 void SMU::run_voltage_sweep() {

@@ -743,6 +743,7 @@ void ScheduledUpdateUploadTask(void* argument) {
 
 		data_packet.serialize_json();
 		logger.debug("JSON length: " + std::to_string(data_packet.serialized_json.length()));
+		logger.debug(data_packet.serialized_json);
 
 		esp.send_data_packet_start(data_packet.serialized_json.length());
 
@@ -759,7 +760,7 @@ void ScheduledUpdateUploadTask(void* argument) {
 
 		data_packet.serialized_json = ""; // free up memory
 
-		osSemaphoreAcquire(esp_messages_sem, osWaitForever);
+		osSemaphoreAcquire(esp_messages_sem, 5000);
 		esp_resp = esp.consume_message();
 		logger.debug(esp_resp);
 
@@ -811,8 +812,16 @@ void SmuUsartRxTask(void* arg) {
 
 		if (comma_pos != std::string::npos) {
 			// extract the current and voltage substrings
-			std::string current = data_str.substr(0, comma_pos);
-			std::string voltage = data_str.substr(comma_pos + 1);
+			std::string voltage = data_str.substr(0, comma_pos);
+			std::string current = data_str.substr(comma_pos + 1);
+
+			if (voltage[0] == '+') {
+				voltage.erase(0,1);
+			}
+
+			if (current[0] == '+') {
+				current.erase(0,1);
+			}
 
 			// create a CurrentVoltagePair using the current and voltage values
 			CurrentVoltagePair pair {current, voltage};
@@ -849,7 +858,7 @@ void update_data() {
 #ifdef SMU_D
 	smu.run_voltage_sweep();
 	osSemaphoreAcquire(smu_done_sem, osWaitForever);
-
+	data_packet.cell_temperatures[0] = 30.2;
 #else
 	for (auto& el : panels) {
 		data_packet.cell_temperatures[el.first] = el.first * 1.54;
@@ -913,14 +922,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 		HAL_UART_Receive_IT(&esp.get_uart_handle(), &esp_usart_rx_buffer[esp_usart_pos], 1);
 	} else if (huart == &smu.get_uart_handle()) {
 		static BufferRange smu_buffer_range = {0, 0};
-		static bool isValCurrent = true;
+		static bool isValVoltage = true;
 
 		// TODO: add some error detection for this (identifying bad packets)
 		// this is all assuming data is a constant stream of "current,voltage,current,voltage," etc.
-		if (isValCurrent && smu_usart_rx_buffer[smu_usart_pos] == ',') {
+		if (isValVoltage && smu_usart_rx_buffer[smu_usart_pos] == ',') {
 			// we got the first value (current), now get next value (voltage)
-			isValCurrent = false;
-		} else if (!isValCurrent && smu_usart_rx_buffer[smu_usart_pos] == ',') {
+			isValVoltage = false;
+		} else if (!isValVoltage && (smu_usart_rx_buffer[smu_usart_pos] == ',' || smu_usart_rx_buffer[smu_usart_pos] == '\r')) {
 			// when a comma is found again, we know this is the end of the voltage reading
 			smu_buffer_range.end = smu_usart_pos-1; // don't include comma
 
@@ -928,7 +937,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 			osMessageQueuePut(smu_data_rx_queue, &smu_buffer_range, 0U, 0U);
 
 			// the next current val will start one position after this voltage value
-			isValCurrent = true;
+			isValVoltage = true;
 			smu_buffer_range.start = smu_usart_pos + 1;
 		}
 
