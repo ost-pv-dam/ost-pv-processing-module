@@ -47,3 +47,8 @@ void DataPacket::serialize_json() {
 	json.str("");
 	json.clear();
 }
+
+void DataPacket::clear() {
+	iv_curves.clear();
+	cell_temperatures.clear();
+}

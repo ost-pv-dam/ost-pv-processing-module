@@ -731,6 +731,7 @@ void ScheduledUpdateUploadTask(void* argument) {
 	for(;;) {
 //		tick += 900000U; // 15 minutes
 		tick += 300000U; // 5 minutes
+//		tick += 60000U; // 1 minute
 
 		update_data();
 
@@ -743,7 +744,6 @@ void ScheduledUpdateUploadTask(void* argument) {
 
 		data_packet.serialize_json();
 		logger.debug("JSON length: " + std::to_string(data_packet.serialized_json.length()));
-		logger.debug(data_packet.serialized_json);
 
 		esp.send_data_packet_start(data_packet.serialized_json.length());
 
@@ -828,7 +828,7 @@ void SmuUsartRxTask(void* arg) {
 
 			// push the CurrentVoltagePair to your data structure
 			data_packet.iv_curves[curr_cell_id].push_back(pair);
-			if (data_packet.iv_curves[curr_cell_id].size() == 8) {
+			if (data_packet.iv_curves[curr_cell_id].size() == 141) {
 				osSemaphoreRelease(smu_done_sem);
 			}
 		} else {
@@ -840,6 +840,7 @@ void SmuUsartRxTask(void* arg) {
 void update_data() {
 
 	osMutexAcquire(data_packet_mutex, osWaitForever);
+	data_packet.clear();
 
 	// TODO: replace with real sensor polling, will probably spawn off separate threads
 	data_packet.timestamp = rtc.get_current_timestamp();

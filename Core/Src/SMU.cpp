@@ -13,8 +13,8 @@ void SMU::config_voltage_sweep() {
 	send_scpi(":SOUR:SWE:SPAC LIN");
 	send_scpi(":SOUR:VOLT:STAR -1");
 	send_scpi(":SOUR:VOLT:STOP 6");
-	send_scpi(":SOUR:VOLT:STEP 1");
-	send_scpi(":TRIG:COUNT 8");
+	send_scpi(":SOUR:VOLT:STEP 0.05");
+	send_scpi(":TRIG:COUNT 141");
 	send_scpi(":FORM:ELEM CURR, VOLT");
 }
 

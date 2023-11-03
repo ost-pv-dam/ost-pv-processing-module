@@ -34,6 +34,8 @@ struct DataPacket {
 	void serialize_json();
 	std::string serialized_json;
 
+	void clear();
+
 private:
 	std::ostringstream json;
 	static std::string get_json_key(std::string field) {
