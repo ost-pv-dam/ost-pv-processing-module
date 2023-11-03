@@ -1,2 +1,2 @@
-../Core/Src/MPL3115A2.cpp:5:6:void MPL3115A2::init()	1
-../Core/Src/MPL3115A2.cpp:14:7:float MPL3115A2::read_baromateric_pressure()	1
+../Core/Src/MPL3115A2.cpp:5:19:HAL_StatusTypeDef MPL3115A2::init()	1
+../Core/Src/MPL3115A2.cpp:16:8:double MPL3115A2::read_baromateric_pressure()	1

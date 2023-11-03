@@ -35,6 +35,7 @@
 #include "data.hpp"
 #include "SMU.hpp"
 #include "real_time_clock.hpp"
+#include "MPL3115A2.hpp"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -52,6 +53,7 @@ struct BufferRange {
 #define ESP32_D
 #define SHT30_D
 #define SMU_D
+#define PRESSURE_D
 
 #define ARRAY_LEN(x)            (sizeof(x) / sizeof((x)[0]))
 /* USER CODE END PD */
@@ -118,6 +120,7 @@ std::unordered_map<uint8_t, GPIOPortPin> panels = {
 /* PERIPHERALS */
 Logger logger(huart1, LogLevel::Debug);
 SHT30 sht(hi2c1);
+MPL3115A2 pressure_sensor(hi2c2);
 Selector selector(panels);
 ESP32 esp(huart2, esp_messages_sem, esp_data_ready_sem);
 SMU smu(huart3);
@@ -231,6 +234,15 @@ int main(void)
   }
 
   logger.info("SHT30 init OK");
+#endif
+
+#ifdef PRESSURE_D
+  if (pressure_sensor.init() != HAL_OK) {
+	  logger.error("Pressure sensor init FAIL");
+	  return 0;
+  } else {
+	  logger.info("Pressure sensor init OK");
+  }
 #endif
 
 #ifdef SELECTOR_D
@@ -846,7 +858,7 @@ void update_data() {
 	data_packet.timestamp = rtc.get_current_timestamp();
 	logger.info("Capture timestamp: " + std::to_string(data_packet.timestamp));
 
-	data_packet.barometric_pressure = 1000.53;
+
 
 #ifdef SHT30_D
 	sht.read_temp_humidity(data_packet.ambient_temp, data_packet.humidity);
@@ -854,6 +866,13 @@ void update_data() {
 #else
 	data_packet.ambient_temp = 70.23;
 	data_packet.humidity = 53.75;
+#endif
+
+#ifdef PRESSURE_D
+	data_packet.barometric_pressure = pressure_sensor.read_baromateric_pressure();
+	logger.info("Pressure: " + std::to_string(data_packet.barometric_pressure));
+#else
+	data_packet.barometric_pressure = 1000.53;
 #endif
 
 #ifdef SMU_D

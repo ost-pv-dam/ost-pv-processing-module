@@ -47,7 +47,8 @@ Core/Src/main.o: ../Core/Src/main.cpp ../Core/Inc/main.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h \
  ../Core/Inc/SHT30.hpp ../Core/Inc/selector.hpp ../Core/Inc/logger.hpp \
  ../Core/Inc/ESP32.hpp ../Core/Inc/data.hpp ../Core/Inc/logger.hpp \
- ../Core/Inc/data.hpp ../Core/Inc/SMU.hpp ../Core/Inc/real_time_clock.hpp
+ ../Core/Inc/data.hpp ../Core/Inc/SMU.hpp ../Core/Inc/real_time_clock.hpp \
+ ../Core/Inc/MPL3115A2.hpp
 ../Core/Inc/main.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
@@ -104,3 +105,4 @@ Core/Src/main.o: ../Core/Src/main.cpp ../Core/Inc/main.h \
 ../Core/Inc/data.hpp:
 ../Core/Inc/SMU.hpp:
 ../Core/Inc/real_time_clock.hpp:
+../Core/Inc/MPL3115A2.hpp:
