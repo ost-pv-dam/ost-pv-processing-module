@@ -110,18 +110,20 @@ osSemaphoreId_t smu_done_sem;
 osMutexId_t data_packet_mutex;
 
 /* CONFIG */
-std::unordered_map<uint8_t, GPIOPortPin> panels = {
-		  {0, {GPIOD, GPIO_PIN_12}},
-		  {1, {GPIOD, GPIO_PIN_13}},
-		  {2, {GPIOD, GPIO_PIN_14}},
-		  {3, {GPIOD, GPIO_PIN_14}}
+// ID -> decoder #
+std::unordered_map<uint8_t, uint8_t> panels = {
+		  {0, 0},
+		  {1, 1},
+		  {2, 2},
+		  {3, 3},
+		  {4, 4}
 };
 
 /* PERIPHERALS */
 Logger logger(huart1, LogLevel::Debug);
 SHT30 sht(hi2c1);
 MPL3115A2 pressure_sensor(hi2c2);
-Selector selector(panels);
+Selector selector(panels, {GPIOD, GPIO_PIN_12}, {GPIOD, GPIO_PIN_13}, {GPIOD, GPIO_PIN_14}, 7);
 ESP32 esp(huart2, esp_messages_sem, esp_data_ready_sem);
 SMU smu(huart3);
 RealTimeClock rtc(hrtc);
@@ -883,18 +885,38 @@ void update_data() {
 	data_packet.barometric_pressure = 1000.53;
 #endif
 
+
 #ifdef SMU_D
-	smu.run_voltage_sweep();
-	osSemaphoreAcquire(smu_done_sem, osWaitForever);
-	data_packet.cell_temperatures[0] = 30.2;
-#else
+#ifdef SELECTOR_D // smu, selector
 	for (auto& el : panels) {
-		data_packet.cell_temperatures[el.first] = el.first * 1.54;
+		selector.select(el.first);
+		curr_cell_id = el.first; // panel ID
+		smu.run_voltage_sweep();
+		osSemaphoreAcquire(smu_done_sem, osWaitForever);
+	}
+#else // smu, no selector (use connected panel for all panel IDs)
+	for (auto& el : panels) {
+		curr_cell_id = el.first; // panel ID
+		smu.run_voltage_sweep();
+		osSemaphoreAcquire(smu_done_sem, osWaitForever);
+	}
+#endif
+#else // no SMU, even if we have selector we have to generate fake data
+	for (auto& el : panels) {
 		data_packet.iv_curves[el.first] = std::vector<CurrentVoltagePair>();
 		for (size_t i = 0; i < 100; i++) {
 			data_packet.iv_curves[el.first].push_back({std::to_string(i*0.34), std::to_string(i*3.75)});
 		}
 	}
+#endif
+
+#ifdef THERMISTORS_D
+	// TODO: read from ADC
+#else // no thermistors
+	for (auto& el : panels) {
+		data_packet.cell_temperatures[el.first] = 30.2;
+	}
+
 #endif
 
 	osMutexRelease(data_packet_mutex);
