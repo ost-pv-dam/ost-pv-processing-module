@@ -105,7 +105,7 @@ std::string ESP32::consume_message() {
 		messages.pop();
 		return msg;
 	} else {
-		return "ERROR: someone tried to consume from an empty message queue";
+		return "ERROR";
 	}
 }
 

@@ -850,15 +850,23 @@ void SmuUsartRxTask(void* arg) {
 }
 
 void update_data() {
+	// TODO: fix RTC so we don't have to re-sync every time
+	esp.flush();
+	esp.send_cmd("AT+HTTPCLIENT=2,0,\"http://18.220.103.162:5050/api/v1/sensorCellData/getCurrentTime\",,,1");
+	osSemaphoreAcquire(esp_messages_sem, 10000U);
+	std::string time_resp = esp.consume_message();
+
+	if (time_resp == "ERROR" || !rtc.parse_and_sync(time_resp)) {
+	  logger.warn("Unable to sync clock, using battery backup...");
+	} else {
+	  logger.info("RTC synchronized to " + std::to_string(rtc.get_current_timestamp()));
+	}
 
 	osMutexAcquire(data_packet_mutex, osWaitForever);
 	data_packet.clear();
 
-	// TODO: replace with real sensor polling, will probably spawn off separate threads
 	data_packet.timestamp = rtc.get_current_timestamp();
 	logger.info("Capture timestamp: " + std::to_string(data_packet.timestamp));
-
-
 
 #ifdef SHT30_D
 	sht.read_temp_humidity(data_packet.ambient_temp, data_packet.humidity);
