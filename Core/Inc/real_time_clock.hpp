@@ -16,4 +16,6 @@ private:
 	RTC_HandleTypeDef& hrtc;
 };
 
+time_t get_timestamp_from_api(std::string time_resp);
+
 #endif // REAL_TIME_CLOCK_H

@@ -112,18 +112,18 @@ osMutexId_t data_packet_mutex;
 /* CONFIG */
 // ID -> decoder #
 std::unordered_map<uint8_t, uint8_t> panels = {
-		  {0, 0},
-		  {1, 1},
-		  {2, 2},
-		  {3, 3},
-		  {4, 4}
+		  {0, 0U},
+		  {1, 1U},
+		  {2, 2U},
+		  {3, 3U},
+		  {4, 4U}
 };
 
 /* PERIPHERALS */
 Logger logger(huart1, LogLevel::Debug);
 SHT30 sht(hi2c1);
 MPL3115A2 pressure_sensor(hi2c2);
-Selector selector(panels, {GPIOD, GPIO_PIN_12}, {GPIOD, GPIO_PIN_13}, {GPIOD, GPIO_PIN_14}, 7);
+Selector selector(panels, 7U, {GPIOD, GPIO_PIN_12}, {GPIOD, GPIO_PIN_13}, {GPIOD, GPIO_PIN_14});
 ESP32 esp(huart2, esp_messages_sem, esp_data_ready_sem);
 SMU smu(huart3);
 RealTimeClock rtc(hrtc);
@@ -743,8 +743,8 @@ void ScheduledUpdateUploadTask(void* argument) {
 	std::string esp_resp;
 
 	for(;;) {
-//		tick += 900000U; // 15 minutes
-		tick += 300000U; // 5 minutes
+		tick += 900000U; // 15 minutes
+//		tick += 300000U; // 5 minutes
 //		tick += 60000U; // 1 minute
 
 		update_data();
@@ -853,22 +853,16 @@ void SmuUsartRxTask(void* arg) {
 
 void update_data() {
 	// TODO: fix RTC so we don't have to re-sync every time
-	esp.flush();
-	esp.send_cmd("AT+HTTPCLIENT=2,0,\"http://18.220.103.162:5050/api/v1/sensorCellData/getCurrentTime\",,,1");
-	osSemaphoreAcquire(esp_messages_sem, 10000U);
-	std::string time_resp = esp.consume_message();
-
-	if (time_resp == "ERROR" || !rtc.parse_and_sync(time_resp)) {
-	  logger.warn("Unable to sync clock, using battery backup...");
-	} else {
-	  logger.info("RTC synchronized to " + std::to_string(rtc.get_current_timestamp()));
-	}
-
 	osMutexAcquire(data_packet_mutex, osWaitForever);
 	data_packet.clear();
 
-	data_packet.timestamp = rtc.get_current_timestamp();
+	esp.flush();
+	esp.send_cmd("AT+HTTPCLIENT=2,0,\"https://api.umich-ost-pv-dam.org:5050/api/v1/sensorCellData/getCurrentTime\",,,2");
+	osSemaphoreAcquire(esp_messages_sem, 10000U);
+	std::string time_resp = esp.consume_message();
+	data_packet.timestamp = get_timestamp_from_api(time_resp);
 	logger.info("Capture timestamp: " + std::to_string(data_packet.timestamp));
+
 
 #ifdef SHT30_D
 	sht.read_temp_humidity(data_packet.ambient_temp, data_packet.humidity);
@@ -895,11 +889,14 @@ void update_data() {
 		osSemaphoreAcquire(smu_done_sem, osWaitForever);
 	}
 #else // smu, no selector (use connected panel for all panel IDs)
-	for (auto& el : panels) {
-		curr_cell_id = el.first; // panel ID
-		smu.run_voltage_sweep();
-		osSemaphoreAcquire(smu_done_sem, osWaitForever);
-	}
+//	for (auto& el : panels) {
+//		curr_cell_id = el.first; // panel ID
+//		smu.run_voltage_sweep();
+//		osSemaphoreAcquire(smu_done_sem, osWaitForever);
+//	}
+
+	smu.run_voltage_sweep();
+	osSemaphoreAcquire(smu_done_sem, osWaitForever);
 #endif
 #else // no SMU, even if we have selector we have to generate fake data
 	for (auto& el : panels) {
@@ -1019,7 +1016,7 @@ void StartDefaultTask(void *argument)
 	  HAL_UART_Receive_IT(&huart3, &smu_usart_rx_buffer[smu_usart_pos], 1);
 
 	  // sync RTC
-	  esp.send_cmd("AT+HTTPCLIENT=2,0,\"http://18.220.103.162:5050/api/v1/sensorCellData/getCurrentTime\",,,1");
+	  esp.send_cmd("AT+HTTPCLIENT=2,0,\"https://api.umich-ost-pv-dam.org:5050/api/v1/sensorCellData/getCurrentTime\",,,2");
 	  osSemaphoreAcquire(esp_messages_sem, osWaitForever);
 	  std::string time_resp = esp.consume_message();
 

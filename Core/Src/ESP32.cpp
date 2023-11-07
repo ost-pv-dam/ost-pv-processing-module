@@ -87,7 +87,7 @@ std::string ESP32::poll(int num_bytes, uint32_t timeout) {
 void ESP32::send_data_packet_start(size_t json_length) {
 	std::ostringstream postCmd;
 
-	postCmd << "AT+HTTPCPOST=\"http://18.220.103.162:5050/api/v1/sensorCellData\",";
+	postCmd << "AT+HTTPCPOST=\"https://api.umich-ost-pv-dam.org:5050/api/v1/sensorCellData\",";
 	postCmd << json_length;
 	postCmd << ",2,\"connection: keep-alive\",\"content-type: application/json\"";
 
