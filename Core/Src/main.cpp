@@ -204,7 +204,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_ADC1_Init();
   MX_I2C2_Init();
-  //MX_SDIO_SD_Init();
+//  MX_SDIO_SD_Init();
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
   MX_RTC_Init();
@@ -212,7 +212,6 @@ int main(void)
 
   Logger::registerInstance(&logger);
   logger.debug("Init");
-
 
 #ifdef ESP32_D
   HAL_Delay(500); // allow ESP to finish any commands from before reset
@@ -360,10 +359,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSE;
-  RCC_OscInitStruct.LSEState = RCC_LSE_BYPASS;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 16;
@@ -388,7 +387,7 @@ void SystemClock_Config(void)
     Error_Handler();
   }
   PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_RTC;
-  PeriphClkInitStruct.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
+  PeriphClkInitStruct.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -693,7 +692,7 @@ static void MX_USART3_UART_Init(void)
 
   /* USER CODE END USART3_Init 1 */
   huart3.Instance = USART3;
-  huart3.Init.BaudRate = 9600;
+  huart3.Init.BaudRate = 57600;
   huart3.Init.WordLength = UART_WORDLENGTH_8B;
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
@@ -720,10 +719,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOD, Panel0_Pin|Panel1_Pin|Panel2_Pin, GPIO_PIN_RESET);
@@ -757,9 +756,9 @@ void ScheduledUpdateUploadTask(void* argument) {
 //		logger.info("ESP RAM: " + esp_resp);
 
 		data_packet.serialize_json();
-		logger.debug("JSON length: " + std::to_string(data_packet.serialized_json.length()));
+		logger.debug("JSON length: " + std::to_string(data_packet.json.length()));
 
-		esp.send_data_packet_start(data_packet.serialized_json.length());
+		esp.send_data_packet_start(data_packet.json.length());
 
 		osSemaphoreAcquire(esp_messages_sem, osWaitForever);
 		esp_resp = esp.consume_message();
@@ -769,10 +768,10 @@ void ScheduledUpdateUploadTask(void* argument) {
 		}
 
 		osSemaphoreAcquire(esp_data_ready_sem, osWaitForever);
-		esp.send_cmd(data_packet.serialized_json, false);
+		esp.send_cmd(data_packet.json, false);
 		osSemaphoreRelease(esp_data_ready_sem);
 
-		data_packet.serialized_json = ""; // free up memory
+		data_packet.json = std::string();
 
 		osSemaphoreAcquire(esp_messages_sem, 5000);
 		esp_resp = esp.consume_message();
@@ -889,20 +888,21 @@ void update_data() {
 		osSemaphoreAcquire(smu_done_sem, osWaitForever);
 	}
 #else // smu, no selector (use connected panel for all panel IDs)
-//	for (auto& el : panels) {
-//		curr_cell_id = el.first; // panel ID
-//		smu.run_voltage_sweep();
-//		osSemaphoreAcquire(smu_done_sem, osWaitForever);
-//	}
+	for (auto& el : panels) {
+		data_packet.iv_curves[el.first].reserve(141);
+	}
 
-	smu.run_voltage_sweep();
-	osSemaphoreAcquire(smu_done_sem, osWaitForever);
+	for (auto& el : panels) {
+		curr_cell_id = el.first; // panel ID
+		smu.run_voltage_sweep();
+		osSemaphoreAcquire(smu_done_sem, osWaitForever);
+	}
 #endif
 #else // no SMU, even if we have selector we have to generate fake data
 	for (auto& el : panels) {
 		data_packet.iv_curves[el.first] = std::vector<CurrentVoltagePair>();
-		for (size_t i = 0; i < 100; i++) {
-			data_packet.iv_curves[el.first].push_back({std::to_string(i*0.34), std::to_string(i*3.75)});
+		for (size_t i = 0; i < 141; i++) {
+			data_packet.iv_curves[el.first].push_back({"-6.000000E+00", "-3.000000E+00"});
 		}
 	}
 #endif
