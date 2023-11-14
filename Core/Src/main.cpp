@@ -51,8 +51,8 @@ struct BufferRange {
 //#define SHT30_D
 //#define SELECTOR_D
 #define ESP32_D
-#define SHT30_D
-#define SMU_D
+//#define SHT30_D
+//#define SMU_D
 #define PRESSURE_D
 
 #define ARRAY_LEN(x)            (sizeof(x) / sizeof((x)[0]))
@@ -73,9 +73,10 @@ RTC_HandleTypeDef hrtc;
 
 SD_HandleTypeDef hsd;
 
+UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
-UART_HandleTypeDef huart3;
+UART_HandleTypeDef huart6;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -120,12 +121,12 @@ std::unordered_map<uint8_t, uint8_t> panels = {
 };
 
 /* PERIPHERALS */
-Logger logger(huart1, LogLevel::Debug);
+Logger logger(huart4, LogLevel::Debug);
 SHT30 sht(hi2c1);
 MPL3115A2 pressure_sensor(hi2c2);
 Selector selector(panels, 7U, {GPIOD, GPIO_PIN_12}, {GPIOD, GPIO_PIN_13}, {GPIOD, GPIO_PIN_14});
 ESP32 esp(huart2, esp_messages_sem, esp_data_ready_sem);
-SMU smu(huart3);
+SMU smu(huart6);
 RealTimeClock rtc(hrtc);
 
 /* BUFFERS */
@@ -154,8 +155,9 @@ static void MX_ADC1_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_SDIO_SD_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_USART3_UART_Init(void);
 static void MX_RTC_Init(void);
+static void MX_UART4_Init(void);
+static void MX_USART6_UART_Init(void);
 void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -204,10 +206,11 @@ int main(void)
   MX_USART1_UART_Init();
   MX_ADC1_Init();
   MX_I2C2_Init();
-//  MX_SDIO_SD_Init();
+  //MX_SDIO_SD_Init();
   MX_USART2_UART_Init();
-  MX_USART3_UART_Init();
   MX_RTC_Init();
+  MX_UART4_Init();
+  MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
 
   Logger::registerInstance(&logger);
@@ -225,6 +228,7 @@ int main(void)
 //  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
 
 #endif
+
 
 
 #ifdef SHT30_D
@@ -246,6 +250,11 @@ int main(void)
   }
 #endif
 
+  while(1) {
+	  logger.info(std::to_string(pressure_sensor.read_baromateric_pressure()));
+	  HAL_Delay(2000);
+  }
+
 #ifdef SELECTOR_D
   selector.deselect_all();
 #endif
@@ -258,7 +267,7 @@ int main(void)
   HAL_NVIC_EnableIRQ(USART2_IRQn);
 
   HAL_NVIC_SetPriority(USART3_IRQn, 5, 0);
-    HAL_NVIC_EnableIRQ(USART3_IRQn);
+  HAL_NVIC_EnableIRQ(USART3_IRQn);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -431,7 +440,7 @@ static void MX_ADC1_Init(void)
   }
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_0;
+  sConfig.Channel = ADC_CHANNEL_4;
   sConfig.Rank = 1;
   sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
@@ -611,6 +620,39 @@ static void MX_SDIO_SD_Init(void)
 }
 
 /**
+  * @brief UART4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_UART4_Init(void)
+{
+
+  /* USER CODE BEGIN UART4_Init 0 */
+
+  /* USER CODE END UART4_Init 0 */
+
+  /* USER CODE BEGIN UART4_Init 1 */
+
+  /* USER CODE END UART4_Init 1 */
+  huart4.Instance = UART4;
+  huart4.Init.BaudRate = 115200;
+  huart4.Init.WordLength = UART_WORDLENGTH_8B;
+  huart4.Init.StopBits = UART_STOPBITS_1;
+  huart4.Init.Parity = UART_PARITY_NONE;
+  huart4.Init.Mode = UART_MODE_TX_RX;
+  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN UART4_Init 2 */
+
+  /* USER CODE END UART4_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -677,35 +719,35 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
-  * @brief USART3 Initialization Function
+  * @brief USART6 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_USART3_UART_Init(void)
+static void MX_USART6_UART_Init(void)
 {
 
-  /* USER CODE BEGIN USART3_Init 0 */
+  /* USER CODE BEGIN USART6_Init 0 */
 
-  /* USER CODE END USART3_Init 0 */
+  /* USER CODE END USART6_Init 0 */
 
-  /* USER CODE BEGIN USART3_Init 1 */
+  /* USER CODE BEGIN USART6_Init 1 */
 
-  /* USER CODE END USART3_Init 1 */
-  huart3.Instance = USART3;
-  huart3.Init.BaudRate = 57600;
-  huart3.Init.WordLength = UART_WORDLENGTH_8B;
-  huart3.Init.StopBits = UART_STOPBITS_1;
-  huart3.Init.Parity = UART_PARITY_NONE;
-  huart3.Init.Mode = UART_MODE_TX_RX;
-  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart3) != HAL_OK)
+  /* USER CODE END USART6_Init 1 */
+  huart6.Instance = USART6;
+  huart6.Init.BaudRate = 115200;
+  huart6.Init.WordLength = UART_WORDLENGTH_8B;
+  huart6.Init.StopBits = UART_STOPBITS_1;
+  huart6.Init.Parity = UART_PARITY_NONE;
+  huart6.Init.Mode = UART_MODE_TX_RX;
+  huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart6.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart6) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN USART3_Init 2 */
+  /* USER CODE BEGIN USART6_Init 2 */
 
-  /* USER CODE END USART3_Init 2 */
+  /* USER CODE END USART6_Init 2 */
 
 }
 
@@ -725,10 +767,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, Panel0_Pin|Panel1_Pin|Panel2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_9|Panel0_Pin|Panel1_Pin|Panel2_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : Panel0_Pin Panel1_Pin Panel2_Pin */
-  GPIO_InitStruct.Pin = Panel0_Pin|Panel1_Pin|Panel2_Pin;
+  /*Configure GPIO pins : PD9 Panel0_Pin Panel1_Pin Panel2_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_9|Panel0_Pin|Panel1_Pin|Panel2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -1013,7 +1055,7 @@ void StartDefaultTask(void *argument)
   /* USER CODE BEGIN 5 */
   for (;;) {
 	  HAL_UART_Receive_IT(&huart2, &esp_usart_rx_buffer[esp_usart_pos], 1);
-	  HAL_UART_Receive_IT(&huart3, &smu_usart_rx_buffer[smu_usart_pos], 1);
+	  HAL_UART_Receive_IT(&huart6, &smu_usart_rx_buffer[smu_usart_pos], 1);
 
 	  // sync RTC
 	  esp.send_cmd("AT+HTTPCLIENT=2,0,\"https://api.umich-ost-pv-dam.org:5050/api/v1/sensorCellData/getCurrentTime\",,,2");
