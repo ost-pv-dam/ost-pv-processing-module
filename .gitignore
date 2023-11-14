@@ -44,3 +44,6 @@
 
 # Libraries
 /lib
+
+# CMake
+cmake-build-*/
