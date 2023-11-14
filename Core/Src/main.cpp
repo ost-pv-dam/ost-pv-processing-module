@@ -20,6 +20,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "fatfs.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -36,6 +37,11 @@
 #include "SMU.hpp"
 #include "real_time_clock.hpp"
 #include "MPL3115A2.hpp"
+
+extern "C" {
+	#include "ff_gen_drv.h"
+
+}
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -53,7 +59,7 @@ struct BufferRange {
 #define ESP32_D
 //#define SHT30_D
 //#define SMU_D
-#define PRESSURE_D
+//#define PRESSURE_D
 
 #define ARRAY_LEN(x)            (sizeof(x) / sizeof((x)[0]))
 /* USER CODE END PD */
@@ -72,6 +78,8 @@ I2C_HandleTypeDef hi2c2;
 RTC_HandleTypeDef hrtc;
 
 SD_HandleTypeDef hsd;
+DMA_HandleTypeDef hdma_sdio_rx;
+DMA_HandleTypeDef hdma_sdio_tx;
 
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart1;
@@ -144,11 +152,17 @@ size_t smu_usart_pos = 0;
 uint8_t smu_usart_rx_buffer[SMU_BUFFER_LENGTH];
 uint8_t curr_cell_id = 0;
 
+FATFS SDFatFs;  /* File system object for SD card logical drive */
+FIL MyFile;     /* File object */
+//char SDPath[4]; /* SD card logical drive path */
+static uint8_t buffer[_MAX_SS]; /* a work buffer for the f_mkfs() */
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_ADC1_Init(void);
@@ -168,6 +182,7 @@ void EspUsartRxTask(void* arg);
 void SmuUsartRxTask(void* arg);
 
 void update_data();
+void sd_test();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -202,15 +217,17 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   MX_ADC1_Init();
   MX_I2C2_Init();
-  //MX_SDIO_SD_Init();
+  MX_SDIO_SD_Init();
   MX_USART2_UART_Init();
   MX_RTC_Init();
   MX_UART4_Init();
   MX_USART6_UART_Init();
+  MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 
   Logger::registerInstance(&logger);
@@ -249,11 +266,6 @@ int main(void)
 	  logger.info("Pressure sensor init OK");
   }
 #endif
-
-  while(1) {
-	  logger.info(std::to_string(pressure_sensor.read_baromateric_pressure()));
-	  HAL_Delay(2000);
-  }
 
 #ifdef SELECTOR_D
   selector.deselect_all();
@@ -604,15 +616,7 @@ static void MX_SDIO_SD_Init(void)
   hsd.Init.ClockPowerSave = SDIO_CLOCK_POWER_SAVE_DISABLE;
   hsd.Init.BusWide = SDIO_BUS_WIDE_1B;
   hsd.Init.HardwareFlowControl = SDIO_HARDWARE_FLOW_CONTROL_DISABLE;
-  hsd.Init.ClockDiv = 0;
-  if (HAL_SD_Init(&hsd) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_SD_ConfigWideBusOperation(&hsd, SDIO_BUS_WIDE_4B) != HAL_OK)
-  {
-    Error_Handler();
-  }
+  hsd.Init.ClockDiv = 127;
   /* USER CODE BEGIN SDIO_Init 2 */
 
   /* USER CODE END SDIO_Init 2 */
@@ -752,6 +756,25 @@ static void MX_USART6_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA2_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA2_Stream3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
+  /* DMA2_Stream6_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream6_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream6_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -775,6 +798,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PA15 */
+  GPIO_InitStruct.Pin = GPIO_PIN_15;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
 }
 
@@ -961,6 +990,102 @@ void update_data() {
 	osMutexRelease(data_packet_mutex);
 }
 
+void sd_test() {
+	FRESULT res;                                          /* FatFs function common result code */
+	  uint32_t byteswritten, bytesread;                     /* File write/read counts */
+	  uint8_t wtext[] = "This is STM32 working with FatFs"; /* File write buffer */
+	  uint8_t rtext[100];                                   /* File read buffer */
+
+	  /*##-1- Link the micro SD disk I/O driver ##################################*/
+
+	    /*##-2- Register the file system object to the FatFs module ##############*/
+	    if(res = f_mount(&SDFatFs, (TCHAR const*)SDPath, 1); res != FR_OK)
+	    {
+	      /* FatFs Initialization Error */
+	      Error_Handler();
+	    }
+	    else
+	    {
+	      /*##-3- Create a FAT file system (format) on the logical drive #########*/
+	      /* WARNING: Formatting the uSD card will delete all content on the device */
+
+//	      if(res = f_mkfs((TCHAR const*)SDPath, FM_ANY, 0, buffer, sizeof(buffer)); res != FR_OK)
+//	      {
+//	        /* FatFs Format Error */
+//	        Error_Handler();
+//	      }
+//	      else
+//	      {
+	        /*##-4- Create and Open a new text file object with write access #####*/
+	        if(res = f_open(&MyFile, "STM32.TXT", FA_CREATE_ALWAYS | FA_WRITE); res != FR_OK)
+	        {
+	          /* 'STM32.TXT' file Open for write Error */
+	          Error_Handler();
+	        }
+	        else
+	        {
+	          /*##-5- Write data to the text file ################################*/
+	          res = f_write(&MyFile, wtext, sizeof(wtext), reinterpret_cast<UINT*>(&byteswritten));
+
+	          if((byteswritten == 0) || (res != FR_OK))
+	          {
+	            /* 'STM32.TXT' file Write or EOF Error */
+	            Error_Handler();
+	          }
+	          else
+	          {
+	            /*##-6- Close the open text file #################################*/
+	            f_close(&MyFile);
+
+	            /*##-7- Open the text file object with read access ###############*/
+	            if(res = f_open(&MyFile, "STM32.TXT", FA_READ); res != FR_OK)
+	            {
+	              /* 'STM32.TXT' file Open for read Error */
+	              Error_Handler();
+	            }
+	            else
+	            {
+	              /*##-8- Read data from the text file ###########################*/
+	              res = f_read(&MyFile, rtext, sizeof(rtext), (UINT*)&bytesread);
+
+	              if((bytesread == 0) || (res != FR_OK))
+	              {
+	                /* 'STM32.TXT' file Read or EOF Error */
+	                Error_Handler();
+	              }
+	              else
+	              {
+	                /*##-9- Close the open text file #############################*/
+	                f_close(&MyFile);
+
+	                /*##-10- Compare read data with the expected data ############*/
+	                if((bytesread != byteswritten))
+	                {
+	                  /* Read data is different from the expected data */
+	                  Error_Handler();
+	                }
+	                else
+	                {
+	                  /* Success of the demo: no error occurrence */
+	                  logger.info("SD card success!");
+	                }
+	              }
+	            }
+	          }
+	        }
+	      }
+
+
+
+	  /*##-11- Unlink the RAM disk I/O driver ####################################*/
+	  FATFS_UnLinkDriver(SDPath);
+
+	  /* Infinite Loop */
+	  for( ;; )
+	  {
+	  }
+}
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	if (huart == &esp.get_uart_handle()) {
 		// short circuit to avoid unnecessary strncmp() calls
@@ -1054,6 +1179,10 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
   for (;;) {
+
+	  sd_test();
+
+	  while (1) {}
 	  HAL_UART_Receive_IT(&huart2, &esp_usart_rx_buffer[esp_usart_pos], 1);
 	  HAL_UART_Receive_IT(&huart6, &smu_usart_rx_buffer[smu_usart_pos], 1);
 
