@@ -228,52 +228,6 @@ int main(void)
   MX_USART6_UART_Init();
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
-
-  Logger::registerInstance(&logger);
-  logger.debug("Init");
-
-#ifdef ESP32_D
-  HAL_Delay(500); // allow ESP to finish any commands from before reset
-  if (!esp.init()) {
-	  logger.error("ESP32 init FAIL!");
-  } else {
-	  logger.info("ESP32 init SUCCESS");
-  }
-
-  HAL_Delay(500);
-//  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
-
-#endif
-
-
-
-#ifdef SHT30_D
-  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
-  if (!sht.init()) {
-	  logger.error("SHT30 init FAIL");
-	  return 0;
-  }
-
-  logger.info("SHT30 init OK");
-#endif
-
-#ifdef PRESSURE_D
-  if (pressure_sensor.init() != HAL_OK) {
-	  logger.error("Pressure sensor init FAIL");
-	  return 0;
-  } else {
-	  logger.info("Pressure sensor init OK");
-  }
-#endif
-
-#ifdef SELECTOR_D
-  selector.deselect_all();
-#endif
-
-#ifdef SMU_D
-  smu.config_voltage_sweep();
-#endif
-
   HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(USART2_IRQn);
 
@@ -285,21 +239,11 @@ int main(void)
   osKernelInitialize();
 
   /* USER CODE BEGIN RTOS_MUTEX */
-  const osMutexAttr_t DataPacket_Mutex_attr = {
-    "dataPacketMutex",                          // human readable mutex name
-    osMutexPrioInherit,    // attr_bits
-    NULL,                                     // memory for control block
-    0U                                        // size for control block
-  };
-
-  data_packet_mutex = osMutexNew(&DataPacket_Mutex_attr);
 
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
-  esp_messages_sem = osSemaphoreNew(10U, 0U, NULL);
-  esp_data_ready_sem = osSemaphoreNew(1U, 0U, NULL);
-  smu_done_sem = osSemaphoreNew(1U, 0U, NULL);
+
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */

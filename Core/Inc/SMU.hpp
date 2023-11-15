@@ -6,8 +6,6 @@
 #include "data.hpp"
 #include <string>
 
-#define SMU_BUFFER_LENGTH 512
-
 class SMU {
 public:
     SMU() = default;

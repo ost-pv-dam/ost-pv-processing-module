@@ -54,7 +54,14 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
+void init();
 
+void update_and_upload_data();
+void process_esp_message();
+void process_smu_data();
+
+void handle_esp_uart_interrupt();
+void handle_smu_uart_interrupt();
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

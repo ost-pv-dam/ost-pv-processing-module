@@ -11,10 +11,21 @@ enum LogLevel {
 	Error
 };
 
+enum LogMode {
+    UART,
+    FILE,
+    UART_AND_FILE
+};
+
 class Logger {
 public:
-	Logger(UART_HandleTypeDef& huart, LogLevel level = Info, std::string newline = "\n") :
-		huart(huart), logLevel(level), newline(newline) {}
+    Logger(Logger &other) = delete;
+    void operator=(const Logger &) = delete;
+    ~Logger() {
+        if (instance != nullptr) {
+            delete instance;
+        }
+    }
 
 	void debug(std::string msg);
 	void info(std::string msg);
@@ -23,21 +34,22 @@ public:
 
 	void direct(std::string msg);
 
-	static void registerInstance(Logger* inst) {
-		instance = inst;
+	static Logger* getInstance() {
+        if (instance == nullptr) {
+            instance = new Logger();
+        } else {
+            return instance;
+        }
 	}
 
-	static Logger* getInstance() {
-		return instance;
-	}
+    UART_HandleTypeDef* huart;
+    LogLevel logLevel = LogLevel::Info;
+    std::string newline = "\n";
 
 private:
-	UART_HandleTypeDef& huart;
-	LogLevel logLevel;
-	std::string newline;
+    Logger() = default;
 
 	static Logger* instance;
-
 	void log(LogLevel level, std::string msg);
 };
 

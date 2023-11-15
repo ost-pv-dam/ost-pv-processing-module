@@ -27,8 +27,10 @@ public:
             esp{std::move(esp)},
             smu{smu} {}
 
+    void init();
+
     void update_and_upload_data() {
-        std::shared_ptr<DataPacket> data = std::make_unique<DataPacket>();
+        std::shared_ptr<DataPacket> data = std::make_unique<DataPacket>(); // need this to be on the heap
     }
 
 
