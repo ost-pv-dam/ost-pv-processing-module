@@ -16,6 +16,11 @@
 #include "real_time_clock.hpp"
 #include "MPL3115A2.hpp"
 
+struct BufferRange {
+    size_t start;
+    size_t end;
+};
+
 class OstPvDam {
 public:
     OstPvDam() = default;

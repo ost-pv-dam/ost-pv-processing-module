@@ -46,10 +46,7 @@ extern "C" {
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-struct BufferRange {
-	size_t start;
-	size_t end;
-};
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -106,9 +103,6 @@ osThreadId_t selectorTaskHandle;
 osThreadId_t httpSendTaskHandle;
 osThreadId_t processHandle;
 osThreadId_t smuProcessHandle;
-
-osMessageQueueId_t esp_msg_rx_queue;
-osMessageQueueId_t smu_data_rx_queue;
 
 
 osSemaphoreId_t esp_data_ready_sem;
@@ -251,12 +245,6 @@ int main(void)
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  esp_msg_rx_queue = osMessageQueueNew(10U, sizeof(BufferRange), NULL);
-  smu_data_rx_queue = osMessageQueueNew(100U, sizeof(BufferRange), NULL);
-
-  if (esp_msg_rx_queue == NULL) {
-       logger.error("Queue creation failed"); // Message Queue object not created, handle failure
-  }
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -264,10 +252,6 @@ int main(void)
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-#ifdef SELECTOR_D
-  selectorTaskHandle = osThreadNew(SelectorCycleTask, NULL, &defaultTask_attributes);
-#endif
-
   const osThreadAttr_t processTask_attributes = {
     .name = "processTask",
     .stack_size = 128 * 4,
@@ -792,16 +776,7 @@ void EspUsartRxTask(void* arg) {
 	for(;;) {
 		osMessageQueueGet(esp_msg_rx_queue, &buffer_range, NULL, osWaitForever);
 
-		if (buffer_range.start <= buffer_range.end) {
-			esp.push_message(std::string((char*) &esp_usart_rx_buffer[buffer_range.start],
-					buffer_range.end + 1 - buffer_range.start));
-		} else {
-			std::string res((char*) &esp_usart_rx_buffer[buffer_range.start],
-					ESP_MAX_RESP_LENGTH - buffer_range.start);
 
-			res += std::string((char*) &esp_usart_rx_buffer[0], buffer_range.end+1);
-			esp.push_message(res);
-		}
 	}
 }
 
@@ -1022,52 +997,7 @@ void sd_test() {
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	if (huart == &esp.get_uart_handle()) {
-		// short circuit to avoid unnecessary strncmp() calls
-		if (esp_usart_rx_buffer[esp_usart_pos] == '\n') {
-			if (esp_usart_pos >= 3 &&
-					!strncmp((char*) &esp_usart_rx_buffer[esp_usart_pos-3], ESP_OK, 4)) {
-				esp_buffer_range.end = esp_usart_pos;
-				osMessageQueuePut(esp_msg_rx_queue, &esp_buffer_range, 0U, 0U);
-
-				if (esp_usart_pos == ESP_MAX_RESP_LENGTH-1) {
-					esp_buffer_range.start = 0;
-				} else {
-					esp_buffer_range.start = esp_usart_pos+1;
-				}
-			} else {
-				// circular buffer look back
-				size_t idx = esp_usart_pos;
-				bool match = true;
-				for (int i = 3; i >= 0; i--) {// ESP_OK length
-					if (ESP_OK[i] != (char) esp_usart_rx_buffer[idx]) {
-						match = false;
-						break;
-					}
-
-					if (idx == 0) {
-						idx = ESP_MAX_RESP_LENGTH-1;
-					} else {
-						--idx;
-					}
-				}
-
-				if (match) {
-					esp_buffer_range.end = esp_usart_pos;
-					osMessageQueuePut(esp_msg_rx_queue, &esp_buffer_range, 0U, 0U);
-					esp_buffer_range.start = esp_usart_pos+1;
-				}
-			}
-		} else if (esp_usart_rx_buffer[esp_usart_pos] == '>') {
-			osSemaphoreRelease(esp_data_ready_sem);
-		}
-
-		if (esp_usart_pos == ESP_MAX_RESP_LENGTH-1) {
-			esp_usart_pos = 0;
-		} else {
-			++esp_usart_pos;
-		}
-
-		HAL_UART_Receive_IT(&esp.get_uart_handle(), &esp_usart_rx_buffer[esp_usart_pos], 1);
+        handle_esp_uart_interrupt();
 	} else if (huart == &smu.get_uart_handle()) {
 		static BufferRange smu_buffer_range = {0, 0};
 		static bool isValVoltage = true;
