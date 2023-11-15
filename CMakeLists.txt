@@ -55,7 +55,10 @@ add_definitions(-DDEBUG -DUSE_HAL_DRIVER -DSTM32F407xx)
 
 file(GLOB_RECURSE SOURCES "Core/*.*" "FATFS/*.*" "Middlewares/*.*" "Drivers/*.*")
 
-set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/STM32F407VETX_FLASH.ld)
+set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/STM32F407VETX_FLASH.ld
+        Core/Src/ost_pv_dam.cpp
+        Core/Inc/ost_pv_dam.hpp
+        Core/Inc/hardware.hpp)
 
 add_link_options(-Wl,-gc-sections,--print-memory-usage,-Map=${PROJECT_BINARY_DIR}/${PROJECT_NAME}.map)
 add_link_options(-mcpu=cortex-m4 -mthumb -mthumb-interwork)

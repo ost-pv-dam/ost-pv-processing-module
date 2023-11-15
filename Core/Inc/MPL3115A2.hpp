@@ -17,12 +17,13 @@
 
 class MPL3115A2 {
 public:
-	MPL3115A2(I2C_HandleTypeDef &i2c_device) : i2c_device(i2c_device) {}
+    MPL3115A2() = default;
+	MPL3115A2(I2C_HandleTypeDef *i2c_device) : i2c_device(i2c_device) {}
 
 	HAL_StatusTypeDef init();
 	double read_baromateric_pressure();
 private:
-	I2C_HandleTypeDef &i2c_device;
+	I2C_HandleTypeDef* i2c_device;
 };
 
 

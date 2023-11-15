@@ -10,19 +10,20 @@
 
 class SMU {
 public:
-	SMU(UART_HandleTypeDef& huart) : huart(huart) {}
+    SMU() = default;
+	SMU(UART_HandleTypeDef* huart) : huart(huart) {}
 
 	void config_voltage_sweep();
 	void run_voltage_sweep();
 
 	void send_scpi(std::string scpi);
 
-	UART_HandleTypeDef& get_uart_handle() {
+	UART_HandleTypeDef* get_uart_handle() {
 		return huart;
 	}
 
 private:
-	UART_HandleTypeDef& huart;
+	UART_HandleTypeDef* huart;
 };
 
 #endif // SMU_H

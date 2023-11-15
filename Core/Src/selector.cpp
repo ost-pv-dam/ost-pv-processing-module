@@ -3,15 +3,13 @@
 using namespace std;
 
 bool Selector::select(uint8_t panel_id) {
-	auto it = panel_outputs.find(panel_id);
-
-	if (it == panel_outputs.end()) {
-		return false; // panel ID not registered
-	}
+	if (panel_id >= num_panels) {
+        return false;
+    }
 
 	deselect_all();
 	HAL_Delay(RELAY_SETTLE_WAIT);
-	set_decoder(it->second);
+	set_decoder(panel_id);
 	return true;
 }
 
@@ -19,7 +17,7 @@ void Selector::deselect_all() {
 	set_decoder(deselect_output);
 }
 
-void Selector::set_decoder(uint8_t output) {
+void Selector::set_decoder(uint8_t output) const {
 	if (output & 0b1) {
 		HAL_GPIO_WritePin(decoder_bit_0.port, decoder_bit_0.pin, GPIO_PIN_SET);
 	} else {

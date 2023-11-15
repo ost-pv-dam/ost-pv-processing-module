@@ -2,7 +2,7 @@
 
 void SMU::send_scpi(std::string scpi) {
 	scpi += "\r";
-	HAL_UART_Transmit(&huart, (uint8_t*) scpi.c_str(), scpi.length(), 100);
+	HAL_UART_Transmit(huart, (uint8_t*) scpi.c_str(), scpi.length(), 100);
 }
 
 void SMU::config_voltage_sweep() {

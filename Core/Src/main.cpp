@@ -61,7 +61,7 @@ struct BufferRange {
 //#define SMU_D
 //#define PRESSURE_D
 
-#define ARRAY_LEN(x)            (sizeof(x) / sizeof((x)[0]))
+constexpr uint32_t SCHEDULED_UPLOAD_PERIOD_MS = (15U * 60U * 1000U); // 15 minutes
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -135,7 +135,6 @@ MPL3115A2 pressure_sensor(hi2c2);
 Selector selector(panels, 7U, {GPIOD, GPIO_PIN_12}, {GPIOD, GPIO_PIN_13}, {GPIOD, GPIO_PIN_14});
 ESP32 esp(huart2, esp_messages_sem, esp_data_ready_sem);
 SMU smu(huart6);
-RealTimeClock rtc(hrtc);
 
 /* BUFFERS */
 DataPacket data_packet;
@@ -813,19 +812,10 @@ void ScheduledUpdateUploadTask(void* argument) {
 	std::string esp_resp;
 
 	for(;;) {
-		tick += 900000U; // 15 minutes
-//		tick += 300000U; // 5 minutes
-//		tick += 60000U; // 1 minute
-
+		tick += SCHEDULED_UPLOAD_PERIOD_MS;
 		update_data();
 
 		esp.flush();
-
-//		esp.send_cmd("AT+SYSRAM?");
-//		osMessageQueueGet(esp_messages_queue, &d, NULL, osWaitForever);
-//		esp_resp = esp.consume_message();
-//		logger.info("ESP RAM: " + esp_resp);
-
 		data_packet.serialize_json();
 		logger.debug("JSON length: " + std::to_string(data_packet.json.length()));
 

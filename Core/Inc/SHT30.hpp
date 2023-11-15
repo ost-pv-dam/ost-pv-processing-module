@@ -12,14 +12,15 @@ constexpr uint16_t SHT30_COMMAND_READ_STATUS = 0xf32d;
 
 class SHT30 {
 public:
-	SHT30(I2C_HandleTypeDef& hi2c) : hi2c(hi2c) {}
+    SHT30() = default;
+	explicit SHT30(I2C_HandleTypeDef* hi2c) : hi2c(hi2c) {}
 
 	bool init();
 	bool send_cmd(uint16_t cmd);
 	bool read_temp_humidity(double& temperature, double& humidity);
 
 private:
-	I2C_HandleTypeDef& hi2c;
+	I2C_HandleTypeDef* hi2c;
 };
 
 #endif // SHT30_H

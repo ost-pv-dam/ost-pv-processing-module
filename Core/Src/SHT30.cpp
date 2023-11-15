@@ -25,7 +25,7 @@ bool SHT30::init() {
 	assert(hi2c.Init.NoStretchMode == I2C_NOSTRETCH_DISABLE);
 
 	uint8_t status_reg_and_checksum[3];
-	if (HAL_I2C_Mem_Read(&hi2c, SHT30_I2C_ADDR << 1u, SHT30_COMMAND_READ_STATUS, 2, (uint8_t*)&status_reg_and_checksum,
+	if (HAL_I2C_Mem_Read(hi2c, SHT30_I2C_ADDR << 1u, SHT30_COMMAND_READ_STATUS, 2, (uint8_t*)&status_reg_and_checksum,
 					  sizeof(status_reg_and_checksum), SHT30_I2C_TIMEOUT) != HAL_OK) {
 		return false;
 	}
@@ -42,7 +42,7 @@ bool SHT30::init() {
 bool SHT30::send_cmd(uint16_t cmd) {
 	uint8_t command_buffer[2] = {(uint8_t)((cmd & 0xff00u) >> 8u), uint8_t(cmd & 0xffu)};
 
-	if (HAL_I2C_Master_Transmit(&hi2c, SHT30_I2C_ADDR << 1u, command_buffer, sizeof(command_buffer),
+	if (HAL_I2C_Master_Transmit(hi2c, SHT30_I2C_ADDR << 1u, command_buffer, sizeof(command_buffer),
 								SHT30_I2C_TIMEOUT) != HAL_OK) {
 		return false;
 	}
@@ -57,7 +57,7 @@ bool SHT30::read_temp_humidity(double& temperature, double& humidity) {
 	HAL_Delay(1);
 
 	uint8_t buffer[6];
-	if (HAL_I2C_Master_Receive(&hi2c, SHT30_I2C_ADDR << 1u, buffer, sizeof(buffer), SHT30_I2C_TIMEOUT) != HAL_OK) {
+	if (HAL_I2C_Master_Receive(hi2c, SHT30_I2C_ADDR << 1u, buffer, sizeof(buffer), SHT30_I2C_TIMEOUT) != HAL_OK) {
 		return false;
 	}
 

@@ -3,12 +3,12 @@
 void ESP32::send_cmd(const std::string& cmd, bool crlf) {
 	if (crlf) {
 		std::string cmd_crlf = cmd + "\r\n";
-		HAL_UART_Transmit(&huart, (uint8_t*) cmd_crlf.c_str(), cmd_crlf.length(), 100);
+		HAL_UART_Transmit(huart, (uint8_t*) cmd_crlf.c_str(), cmd_crlf.length(), 100);
 	} else {
 		if (cmd.length() > LONG_CMD_THRESHOLD) {
-			HAL_UART_Transmit(&huart, (uint8_t*) cmd.c_str(), cmd.length(), HAL_MAX_DELAY);
+			HAL_UART_Transmit(huart, (uint8_t*) cmd.c_str(), cmd.length(), HAL_MAX_DELAY);
 		} else {
-			HAL_UART_Transmit(&huart, (uint8_t*) cmd.c_str(), cmd.length(), 100);
+			HAL_UART_Transmit(huart, (uint8_t*) cmd.c_str(), cmd.length(), 100);
 		}
 	}
 }
@@ -76,7 +76,7 @@ int ESP32::init() {
 
 std::string ESP32::poll(int num_bytes, uint32_t timeout) {
 	char* buf = new char[num_bytes+1]();
-	HAL_UART_Receive(&huart, (uint8_t*) buf, num_bytes, timeout);
+	HAL_UART_Receive(huart, (uint8_t*) buf, num_bytes, timeout);
 	std::string ret(buf);
 	delete[] buf;
 
@@ -96,7 +96,7 @@ void ESP32::send_data_packet_start(size_t json_length) {
 
 void ESP32::push_message(std::string msg) {
 	messages.push(msg);
-	osSemaphoreRelease(external_queue);
+	osSemaphoreRelease(*external_queue);
 }
 
 std::string ESP32::consume_message() {
@@ -110,6 +110,6 @@ std::string ESP32::consume_message() {
 }
 
 void ESP32::flush() {
-	osMessageQueueReset(external_queue);
+	osMessageQueueReset(*external_queue);
 	std::queue<std::string>().swap(messages);
 }

@@ -20,8 +20,9 @@ constexpr size_t ESP_MAX_RESP_LENGTH = 512; // probably good enough?
 
 class ESP32 {
 public:
-	ESP32(UART_HandleTypeDef& huart, osMessageQueueId_t& external_queue, osSemaphoreId_t& data_ready_sem) :
-		huart(huart), external_queue(external_queue), data_ready_sem(data_ready_sem) {}
+    ESP32() = default;
+	ESP32(UART_HandleTypeDef* huart, osMessageQueueId_t* external_queue) :
+		huart(huart), external_queue(external_queue) {}
 
 	int init();
 	void send_cmd(const std::string& cmd, bool crlf = true);
@@ -33,16 +34,15 @@ public:
 	std::string consume_message();
 	void flush();
 
-	UART_HandleTypeDef& get_uart_handle() {
+	UART_HandleTypeDef* get_uart_handle() {
 		return huart;
 	}
 
 private:
-	UART_HandleTypeDef& huart;
+	UART_HandleTypeDef* huart;
 	std::queue<std::string> messages;
 
-	osSemaphoreId_t& external_queue;
-	osSemaphoreId_t& data_ready_sem;
+	osSemaphoreId_t* external_queue;
 };
 
 #endif // ESP32_H

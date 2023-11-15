@@ -13,11 +13,12 @@ struct GPIOPortPin {
 
 class Selector {
 public:
-	Selector(const std::unordered_map<uint8_t, uint8_t> panel_outputs, uint8_t deselect_output,
+    Selector() = default;
+	Selector(uint8_t num_panels, uint8_t deselect_output,
 			GPIOPortPin decoder_bit_0,
 			GPIOPortPin decoder_bit_1,
 			GPIOPortPin decoder_bit_2) :
-				panel_outputs(panel_outputs),
+				num_panels(num_panels),
 				deselect_output(deselect_output),
 				decoder_bit_0(decoder_bit_0),
 				decoder_bit_1(decoder_bit_1),
@@ -27,14 +28,13 @@ public:
 	void deselect_all();
 
 private:
-	std::unordered_map<uint8_t, uint8_t> panel_outputs;
+	uint8_t num_panels;
 	uint8_t deselect_output;
 	GPIOPortPin decoder_bit_0;
 	GPIOPortPin decoder_bit_1;
 	GPIOPortPin decoder_bit_2;
 
-
-	void set_decoder(uint8_t output);
+	void set_decoder(uint8_t output) const;
 };
 
 #endif // SELECTOR_H
