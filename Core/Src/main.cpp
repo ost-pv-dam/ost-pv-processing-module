@@ -38,6 +38,7 @@
 #include "real_time_clock.hpp"
 #include "MPL3115A2.hpp"
 #include "thermistor_array.hpp"
+#include <stdexcept>
 
 extern "C" {
 	#include "ff_gen_drv.h"
@@ -122,6 +123,39 @@ osSemaphoreId_t adc_done_sem;
 
 osMutexId_t data_packet_mutex;
 
+void * operator new( size_t size )
+{
+	void* ret = pvPortMalloc( size );
+	if (ret == NULL) {
+		HeapStats_t stats;
+		vPortGetHeapStats(&stats);
+		Error_Handler();
+	}
+
+    return ret;
+}
+
+void * operator new[]( size_t size )
+{
+	void* ret = pvPortMalloc( size );
+	if (ret == NULL) {
+		Logger::getInstance()->debug(std::to_string(xPortGetFreeHeapSize()));
+		Error_Handler();
+	}
+
+	return ret;
+}
+
+void operator delete( void * ptr )
+{
+    vPortFree ( ptr );
+}
+
+void operator delete[]( void * ptr )
+{
+    vPortFree ( ptr );
+}
+
 /* CONFIG */
 // ID -> decoder #
 std::unordered_map<uint8_t, uint8_t> panels = {
@@ -159,8 +193,6 @@ uint8_t curr_cell_id = 0;
 
 FATFS SDFatFs;  /* File system object for SD card logical drive */
 FIL MyFile;     /* File object */
-//char SDPath[4]; /* SD card logical drive path */
-static uint8_t buffer[_MAX_SS]; /* a work buffer for the f_mkfs() */
 
 /* USER CODE END PV */
 
@@ -188,6 +220,8 @@ void SmuUsartRxTask(void* arg);
 
 void update_data();
 void sd_test();
+
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -232,59 +266,10 @@ int main(void)
   MX_RTC_Init();
   MX_UART4_Init();
   MX_USART6_UART_Init();
-  MX_FATFS_Init();
+//  MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 
-  Logger::registerInstance(&logger);
-  logger.debug("Init");
 
-#ifdef ESP32_D
-  HAL_Delay(500); // allow ESP to finish any commands from before reset
-  if (!esp.init()) {
-	  logger.error("ESP32 init FAIL!");
-  } else {
-	  logger.info("ESP32 init SUCCESS");
-  }
-
-  HAL_Delay(500);
-//  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
-
-#endif
-
-
-
-#ifdef SHT30_D
-  HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
-  if (!sht.init()) {
-	  logger.error("SHT30 init FAIL");
-	  return 0;
-  }
-
-  logger.info("SHT30 init OK");
-#endif
-
-#ifdef PRESSURE_D
-  if (pressure_sensor.init() != HAL_OK) {
-	  logger.error("Pressure sensor init FAIL");
-	  return 0;
-  } else {
-	  logger.info("Pressure sensor init OK");
-  }
-#endif
-
-#ifdef SELECTOR_D
-  selector.deselect_all();
-#endif
-
-#ifdef SMU_D
-  smu.config_voltage_sweep();
-#endif
-
-  HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(USART2_IRQn);
-
-  HAL_NVIC_SetPriority(USART3_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(USART3_IRQn);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -315,7 +300,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_QUEUES */
   esp_msg_rx_queue = osMessageQueueNew(10U, sizeof(BufferRange), NULL);
-  smu_data_rx_queue = osMessageQueueNew(100U, sizeof(BufferRange), NULL);
+  smu_data_rx_queue = osMessageQueueNew(50U, sizeof(BufferRange), NULL);
 
   if (esp_msg_rx_queue == NULL) {
        logger.error("Queue creation failed"); // Message Queue object not created, handle failure
@@ -838,6 +823,8 @@ void ScheduledUpdateUploadTask(void* argument) {
 		data_packet.serialize_json();
 		logger.debug("JSON length: " + std::to_string(data_packet.json.length()));
 
+		logger.debug(std::to_string(xPortGetFreeHeapSize()));
+
 		esp.send_data_packet_start(data_packet.json.length());
 
 		osSemaphoreAcquire(esp_messages_sem, osWaitForever);
@@ -932,6 +919,7 @@ void SmuUsartRxTask(void* arg) {
 
 void update_data() {
 	// TODO: fix RTC so we don't have to re-sync every time
+	logger.debug(std::to_string(xPortGetFreeHeapSize()));
 	osMutexAcquire(data_packet_mutex, osWaitForever);
 	data_packet.clear();
 
@@ -999,12 +987,14 @@ void update_data() {
 	for (auto& el : panels) {
 		data_packet.iv_curves[el.first] = std::vector<CurrentVoltagePair>();
 		for (size_t i = 0; i < 141; i++) {
-			data_packet.iv_curves[el.first].push_back({"-6.000000E+00", "-3.000000E+00"});
+			data_packet.iv_curves[el.first].push_back({"-6.0E+00", "-3.0E+00"});
 		}
 	}
 #endif
 
 	osMutexRelease(data_packet_mutex);
+
+	logger.debug(std::to_string(xPortGetFreeHeapSize()));
 }
 
 void sd_test() {
@@ -1200,6 +1190,56 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
   for (;;) {
+	  Logger::registerInstance(&logger);
+	    logger.debug("Init");
+
+	  #ifdef ESP32_D
+	    HAL_Delay(500); // allow ESP to finish any commands from before reset
+	    if (!esp.init()) {
+	  	  logger.error("ESP32 init FAIL!");
+	    } else {
+	  	  logger.info("ESP32 init SUCCESS");
+	    }
+
+	    HAL_Delay(500);
+	  //  HAL_UART_Receive_IT(&huart2, &esp_buf, 1);
+
+	  #endif
+
+
+
+	  #ifdef SHT30_D
+	    HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
+	    if (!sht.init()) {
+	  	  logger.error("SHT30 init FAIL");
+	  	  return 0;
+	    }
+
+	    logger.info("SHT30 init OK");
+	  #endif
+
+	  #ifdef PRESSURE_D
+	    if (pressure_sensor.init() != HAL_OK) {
+	  	  logger.error("Pressure sensor init FAIL");
+	  	  return 0;
+	    } else {
+	  	  logger.info("Pressure sensor init OK");
+	    }
+	  #endif
+
+	  #ifdef SELECTOR_D
+	    selector.deselect_all();
+	  #endif
+
+	  #ifdef SMU_D
+	    smu.config_voltage_sweep();
+	  #endif
+
+	    HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);
+	    HAL_NVIC_EnableIRQ(USART2_IRQn);
+
+	    HAL_NVIC_SetPriority(USART3_IRQn, 5, 0);
+	    HAL_NVIC_EnableIRQ(USART3_IRQn);
 
 //	  sd_test();
 

@@ -9,6 +9,7 @@ void DataPacket::serialize_json() {
 	json += get_json_key("iv_curves") += "{";
 
 	for (auto it = iv_curves.begin(); it != iv_curves.end(); it++) {
+		Logger::getInstance()->debug(std::to_string(xPortGetFreeHeapSize()));
 		json += get_json_key(std::to_string(it->first)) += "["; // panel ID
 		for (size_t i = 0; i < it->second.size(); i++) {
 			const CurrentVoltagePair& reading = it->second[i];

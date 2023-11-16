@@ -12,6 +12,8 @@
 #include <unordered_map>
 #include <vector>
 #include <sstream>
+#include "cmsis_os.h"
+#include "logger.hpp"
 
 /* measured cell voltage for the supplied current */
 struct CurrentVoltagePair {
