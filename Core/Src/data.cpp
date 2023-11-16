@@ -50,5 +50,5 @@ void DataPacket::serialize_json() {
 void DataPacket::clear() {
 	iv_curves = std::unordered_map<uint8_t, std::vector<CurrentVoltagePair>>();
 	cell_temperatures = std::unordered_map<uint8_t, double>();
-	json = std::string();
+	json = JsonBuilder();
 }

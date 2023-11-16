@@ -821,11 +821,11 @@ void ScheduledUpdateUploadTask(void* argument) {
 //		logger.info("ESP RAM: " + esp_resp);
 
 		data_packet.serialize_json();
-		logger.debug("JSON length: " + std::to_string(data_packet.json.length()));
+		logger.debug("JSON length: " + std::to_string(data_packet.json.chunks().size()));
 
 		logger.debug(std::to_string(xPortGetFreeHeapSize()));
 
-		esp.send_data_packet_start(data_packet.json.length());
+		esp.send_data_packet_start(data_packet.json.chunks().size());
 
 		osSemaphoreAcquire(esp_messages_sem, osWaitForever);
 		esp_resp = esp.consume_message();
@@ -835,10 +835,14 @@ void ScheduledUpdateUploadTask(void* argument) {
 		}
 
 		osSemaphoreAcquire(esp_data_ready_sem, osWaitForever);
-		esp.send_cmd(data_packet.json, false);
-		osSemaphoreRelease(esp_data_ready_sem);
 
-		data_packet.json = std::string();
+        while (!data_packet.json.chunks().empty()) {
+            esp.send_cmd(data_packet.json.chunks().front(), false);
+            data_packet.json.chunks().pop_front();
+        }
+
+		osSemaphoreRelease(esp_data_ready_sem);
+		data_packet.json = JsonBuilder();
 
 		osSemaphoreAcquire(esp_messages_sem, 5000);
 		esp_resp = esp.consume_message();
@@ -849,7 +853,7 @@ void ScheduledUpdateUploadTask(void* argument) {
 }
 
 void EspUsartRxTask(void* arg) {
-	BufferRange buffer_range;
+	BufferRange buffer_range{0,0};
 
 	for(;;) {
 		osMessageQueueGet(esp_msg_rx_queue, &buffer_range, NULL, osWaitForever);
@@ -868,7 +872,7 @@ void EspUsartRxTask(void* arg) {
 }
 
 void SmuUsartRxTask(void* arg) {
-	BufferRange buffer_range;
+	BufferRange buffer_range{0,0};
 
 	for(;;) {
 		osMessageQueueGet(smu_data_rx_queue, &buffer_range, NULL, osWaitForever);

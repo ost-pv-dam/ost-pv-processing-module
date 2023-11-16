@@ -1,17 +1,11 @@
-/*
- * solar_processing_structs.h
- *
- *  Created on: Oct 4, 2023
- *      Author: adarsh
- */
-
 #ifndef DATA_H
 #define DATA_H
 
-#include <time.h>
+#include <ctime>
 #include <unordered_map>
 #include <vector>
 #include <sstream>
+#include <deque>
 #include "cmsis_os.h"
 #include "logger.hpp"
 
@@ -19,6 +13,23 @@
 struct CurrentVoltagePair {
 	std::string current;
 	std::string voltage;
+};
+
+class JsonBuilder {
+public:
+    JsonBuilder() = default;
+
+    JsonBuilder& operator+=(const std::string& str) {
+        data.push_back(str);
+        return *this;
+    }
+
+    std::deque<std::string>& chunks() {
+        return data;
+    }
+
+private:
+    std::deque<std::string> data;
 };
 
 
@@ -34,7 +45,7 @@ struct DataPacket {
 	std::unordered_map<uint8_t, double> cell_temperatures;
 
 	void serialize_json();
-	std::string json;
+	JsonBuilder json;
 
 	void clear();
 
@@ -43,18 +54,5 @@ private:
 		return "\"" + field + "\": ";
 	}
 };
-
-
-
-/*
-enum ErrorCode {
-    NO_ERROR = 0,
-    ERROR_INVALID_PARAMETER,
-    ERROR_TIMEOUT,
-	ERROR_HAL,
-    // Add more error codes as needed
-
-}
-*/
 
 #endif /* DATA_H */
