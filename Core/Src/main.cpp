@@ -37,6 +37,7 @@
 #include "SMU.hpp"
 #include "real_time_clock.hpp"
 #include "MPL3115A2.hpp"
+#include "thermistor_array.hpp"
 
 extern "C" {
 	#include "ff_gen_drv.h"
@@ -60,6 +61,7 @@ struct BufferRange {
 //#define SHT30_D
 //#define SMU_D
 //#define PRESSURE_D
+#define THERMISTORS_D
 
 #define ARRAY_LEN(x)            (sizeof(x) / sizeof((x)[0]))
 /* USER CODE END PD */
@@ -71,6 +73,7 @@ struct BufferRange {
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
 
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c2;
@@ -115,6 +118,7 @@ osSemaphoreId_t esp_data_ready_sem;
 osSemaphoreId_t esp_messages_sem;
 
 osSemaphoreId_t smu_done_sem;
+osSemaphoreId_t adc_done_sem;
 
 osMutexId_t data_packet_mutex;
 
@@ -136,6 +140,7 @@ Selector selector(panels, 7U, {GPIOD, GPIO_PIN_12}, {GPIOD, GPIO_PIN_13}, {GPIOD
 ESP32 esp(huart2, esp_messages_sem, esp_data_ready_sem);
 SMU smu(huart6);
 RealTimeClock rtc(hrtc);
+ThermistorArray thermistor_array(&hadc1, 1);
 
 /* BUFFERS */
 DataPacket data_packet;
@@ -222,7 +227,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_ADC1_Init();
   MX_I2C2_Init();
-  MX_SDIO_SD_Init();
+//  MX_SDIO_SD_Init();
   MX_USART2_UART_Init();
   MX_RTC_Init();
   MX_UART4_Init();
@@ -301,6 +306,7 @@ int main(void)
   esp_messages_sem = osSemaphoreNew(10U, 0U, NULL);
   esp_data_ready_sem = osSemaphoreNew(1U, 0U, NULL);
   smu_done_sem = osSemaphoreNew(1U, 0U, NULL);
+  adc_done_sem = osSemaphoreNew(1U, 0U, NULL);
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -437,8 +443,8 @@ static void MX_ADC1_Init(void)
   hadc1.Instance = ADC1;
   hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.ScanConvMode = DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.ScanConvMode = ENABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
@@ -765,6 +771,9 @@ static void MX_DMA_Init(void)
   __HAL_RCC_DMA2_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA2_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
   /* DMA2_Stream3_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
@@ -949,6 +958,23 @@ void update_data() {
 	data_packet.barometric_pressure = 1000.53;
 #endif
 
+#ifdef THERMISTORS_D
+    thermistor_array.update();
+    osSemaphoreAcquire(adc_done_sem, osWaitForever);
+    data_packet.cell_temperatures[0] = thermistor_array.get_temperature_at(0);
+    logger.debug("Thermistor 0: " + std::to_string(data_packet.cell_temperatures[0]));
+
+    for (auto& el : panels) {
+        if (el.first == 0) continue;
+        data_packet.cell_temperatures[el.first] = 30.2;
+    }
+
+
+#else // no thermistors
+    for (auto& el : panels) {
+        data_packet.cell_temperatures[el.first] = 30.2;
+    }
+#endif
 
 #ifdef SMU_D
 #ifdef SELECTOR_D // smu, selector
@@ -976,15 +1002,6 @@ void update_data() {
 			data_packet.iv_curves[el.first].push_back({"-6.000000E+00", "-3.000000E+00"});
 		}
 	}
-#endif
-
-#ifdef THERMISTORS_D
-	// TODO: read from ADC
-#else // no thermistors
-	for (auto& el : panels) {
-		data_packet.cell_temperatures[el.first] = 30.2;
-	}
-
 #endif
 
 	osMutexRelease(data_packet_mutex);
@@ -1086,6 +1103,10 @@ void sd_test() {
 	  }
 }
 
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
+    osSemaphoreRelease(adc_done_sem);
+}
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	if (huart == &esp.get_uart_handle()) {
 		// short circuit to avoid unnecessary strncmp() calls
@@ -1180,15 +1201,15 @@ void StartDefaultTask(void *argument)
   /* USER CODE BEGIN 5 */
   for (;;) {
 
-	  sd_test();
+//	  sd_test();
 
-	  while (1) {}
+//	  while (1) {}
 	  HAL_UART_Receive_IT(&huart2, &esp_usart_rx_buffer[esp_usart_pos], 1);
 	  HAL_UART_Receive_IT(&huart6, &smu_usart_rx_buffer[smu_usart_pos], 1);
 
 	  // sync RTC
 	  esp.send_cmd("AT+HTTPCLIENT=2,0,\"https://api.umich-ost-pv-dam.org:5050/api/v1/sensorCellData/getCurrentTime\",,,2");
-	  osSemaphoreAcquire(esp_messages_sem, osWaitForever);
+	  osSemaphoreAcquire(esp_messages_sem, 3000);
 	  std::string time_resp = esp.consume_message();
 
 	  if (!rtc.parse_and_sync(time_resp)) {
