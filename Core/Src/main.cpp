@@ -39,6 +39,7 @@
 #include "MPL3115A2.hpp"
 #include "thermistor_array.hpp"
 #include <stdexcept>
+#include <optional>
 
 extern "C" {
 	#include "ff_gen_drv.h"
@@ -107,7 +108,7 @@ const osThreadAttr_t httpTask_attributes = {
 };
 
 osThreadId_t selectorTaskHandle;
-osThreadId_t httpSendTaskHandle;
+osThreadId_t scheduledSendTaskHandle;
 osThreadId_t processHandle;
 osThreadId_t smuProcessHandle;
 
@@ -173,7 +174,6 @@ MPL3115A2 pressure_sensor(hi2c2);
 Selector selector(panels, 7U, {GPIOD, GPIO_PIN_12}, {GPIOD, GPIO_PIN_13}, {GPIOD, GPIO_PIN_14});
 ESP32 esp(huart2, esp_messages_sem, esp_data_ready_sem);
 SMU smu(huart6);
-RealTimeClock rtc(hrtc);
 ThermistorArray thermistor_array(&hadc1, 1);
 
 /* BUFFERS */
@@ -922,18 +922,24 @@ void SmuUsartRxTask(void* arg) {
 }
 
 void update_data() {
-	// TODO: fix RTC so we don't have to re-sync every time
 	logger.debug(std::to_string(xPortGetFreeHeapSize()));
 	osMutexAcquire(data_packet_mutex, osWaitForever);
 	data_packet.clear();
 
 	esp.flush();
-	esp.send_cmd("AT+HTTPCLIENT=2,0,\"https://api.umich-ost-pv-dam.org:5050/api/v1/sensorCellData/getCurrentTime\",,,2");
+	esp.send_cmd("AT+SYSTIMESTAMP?");
 	osSemaphoreAcquire(esp_messages_sem, 10000U);
 	std::string time_resp = esp.consume_message();
-	data_packet.timestamp = get_timestamp_from_api(time_resp);
-	logger.info("Capture timestamp: " + std::to_string(data_packet.timestamp));
+    std::optional<time_t> timestamp = get_timestamp_from_api(time_resp);
 
+    if (timestamp) {
+        data_packet.timestamp = timestamp.value();
+    } else {
+        logger.warn("Unable to get timestamp from ESP RTC");
+        data_packet.timestamp = 0; // what's a good fallback?
+    }
+
+	logger.info("Capture timestamp: " + std::to_string(data_packet.timestamp));
 
 #ifdef SHT30_D
 	sht.read_temp_humidity(data_packet.ambient_temp, data_packet.humidity);
@@ -1210,8 +1216,6 @@ void StartDefaultTask(void *argument)
 
 	  #endif
 
-
-
 	  #ifdef SHT30_D
 	    HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
 	    if (!sht.init()) {
@@ -1239,30 +1243,24 @@ void StartDefaultTask(void *argument)
 	    smu.config_voltage_sweep();
 	  #endif
 
-	    HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);
-	    HAL_NVIC_EnableIRQ(USART2_IRQn);
+        HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);
+        HAL_NVIC_EnableIRQ(USART2_IRQn);
 
-	    HAL_NVIC_SetPriority(USART3_IRQn, 5, 0);
-	    HAL_NVIC_EnableIRQ(USART3_IRQn);
+        HAL_NVIC_SetPriority(USART3_IRQn, 5, 0);
+        HAL_NVIC_EnableIRQ(USART3_IRQn);
 
-//	  sd_test();
-
-//	  while (1) {}
 	  HAL_UART_Receive_IT(&huart2, &esp_usart_rx_buffer[esp_usart_pos], 1);
 	  HAL_UART_Receive_IT(&huart6, &smu_usart_rx_buffer[smu_usart_pos], 1);
 
-	  // sync RTC
-	  esp.send_cmd("AT+HTTPCLIENT=2,0,\"https://api.umich-ost-pv-dam.org:5050/api/v1/sensorCellData/getCurrentTime\",,,2");
-	  osSemaphoreAcquire(esp_messages_sem, 3000);
-	  std::string time_resp = esp.consume_message();
+      esp.send_cmd("AT+CIPSNTPCFG=1,-5,\"time.nist.gov\"");
 
-	  if (!rtc.parse_and_sync(time_resp)) {
-		  logger.warn("Unable to sync clock, using battery backup...");
-	  } else {
-		  logger.info("RTC synchronized to " + std::to_string(rtc.get_current_timestamp()));
-	  }
+      auto msg_status = osSemaphoreAcquire(esp_messages_sem, 10000U);
 
-	  httpSendTaskHandle = osThreadNew(ScheduledUpdateUploadTask, NULL, &httpTask_attributes);
+      if (msg_status == osErrorTimeout || esp.consume_message().find("+TIME_UPDATED") == std::string::npos) {
+          logger.warn("ESP clock not synced with NTP");
+      }
+
+      scheduledSendTaskHandle = osThreadNew(ScheduledUpdateUploadTask, NULL, &httpTask_attributes);
 	  osThreadSuspend(defaultTaskHandle);
   }
   /* USER CODE END 5 */
