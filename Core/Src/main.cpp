@@ -35,6 +35,7 @@
 #include "ESP32.hpp"
 #include "data.hpp"
 #include "SMU.hpp"
+#include "VC0706.hpp"
 #include "real_time_clock.hpp"
 #include "MPL3115A2.hpp"
 #include "thermistor_array.hpp"
@@ -929,6 +930,44 @@ void SmuUsartRxTask(void* arg) {
 		}
 	}
 }
+
+int update_photo(VC0706 &camera_handle) {
+
+    if (!camera_handle.begin()) {
+      // camera failed to initialize
+      return -1;
+    }
+
+    if (!camera_handle.set_image_size(VC0706_640x480)) {
+      // camera failed to set image size
+      return -1;
+    }
+    
+    if (!camera_handle.take_picture()) {
+      // camera failed to take picture image size
+      return -1;
+    }
+
+    uint32_t jpg_size = camera_handle.frameLength();
+
+    const int num_chunks = 4;
+    const int chunk_size = std::ceil(jpg_size / num_chunks);
+
+    for (int chunk = 0; chunk < num_chunks; ++chunk) {
+      uint8_t *buffer;
+      while (chunk_size > 0) {
+        // read 32 bytes at a time;
+        uint8_t bytesToRead = std::min((uint32_t) 32, jpg_size); // change 32 to 64 for a speedup but may not work with all setups!
+        buffer = camera_handle.read_picture(bytesToRead);
+
+        jpg_size -= bytesToRead;
+      }
+
+      // send first chunk to esp
+
+    }
+}
+
 
 void update_data() {
 	// TODO: fix RTC so we don't have to re-sync every time
