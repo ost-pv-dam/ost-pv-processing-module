@@ -176,6 +176,9 @@ ESP32 esp(huart2, esp_messages_sem, esp_data_ready_sem);
 SMU smu(huart6);
 ThermistorArray thermistor_array(&hadc1, 1);
 
+/* CONSTANTS */
+static constexpr uint32_t SCHEDULED_UPLOAD_PERIOD_MS = 15 * 60 * 1000;
+
 /* BUFFERS */
 DataPacket data_packet;
 uint8_t esp_buf;
@@ -807,9 +810,7 @@ void ScheduledUpdateUploadTask(void* argument) {
 	std::string esp_resp;
 
 	for(;;) {
-		tick += 900000U; // 15 minutes
-//		tick += 300000U; // 5 minutes
-//		tick += 60000U; // 1 minute
+		tick += SCHEDULED_UPLOAD_PERIOD_MS;
 
 		update_data();
 

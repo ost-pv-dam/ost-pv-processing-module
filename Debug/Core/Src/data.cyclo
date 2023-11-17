@@ -7,14 +7,12 @@
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/char_traits.h:393:7:static constexpr std::size_t std::char_traits<char>::length(const char_type*)	2
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/arm-none-eabi/thumb/v7e-m+fp/hard/bits/gthr-default.h:229:1:int __gthread_key_delete(__gthread_key_t)	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/basic_string.h:6660:3:std::string std::__cxx11::to_string(int)	2
-/Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/basic_string.h:6671:3:std::string std::__cxx11::to_string(unsigned int)	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/basic_string.h:6698:3:std::string std::__cxx11::to_string(long long int)	2
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/basic_string.h:6730:3:std::string std::__cxx11::to_string(double)	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_list.h:110:7:std::__detail::_List_node_header::_List_node_header()	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_list.h:130:7:void std::__detail::_List_node_header::_M_move_nodes(std::__detail::_List_node_header&&)	2
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_list.h:150:7:void std::__detail::_List_node_header::_M_init()	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_list.h:159:24:std::__detail::_List_node_base* std::__detail::_List_node_header::_M_base()	1
-../Core/Inc/logger.hpp:30:17:static Logger* Logger::getInstance()	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_deque.h:96:3:constexpr std::size_t std::__deque_buf_size(std::size_t)	2
 ../Core/Inc/data.hpp:25:18:JsonBuilder& JsonBuilder::operator+=(const string&)	1
 ../Core/Inc/data.hpp:65:21:static std::string DataPacket::get_json_key(std::string)	1
@@ -46,7 +44,7 @@
 ../Core/Inc/data.hpp:23:5:JsonBuilder::JsonBuilder()	1
 ../Core/Inc/data.hpp:21:7:JsonBuilder::~JsonBuilder()	1
 ../Core/Inc/data.hpp:21:7:JsonBuilder& JsonBuilder::operator=(JsonBuilder&&)	1
-../Core/Src/data.cpp:64:6:void DataPacket::clear()	1
+../Core/Src/data.cpp:50:6:void DataPacket::clear()	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_algobase.h:254:5:constexpr const _Tp& std::max(const _Tp&, const _Tp&) [with _Tp = unsigned int]	2
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/char_traits.h:106:7:static constexpr bool __gnu_cxx::char_traits<_CharT>::eq(const char_type&, const char_type&) [with _CharT = char]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/char_traits.h:167:5:static constexpr std::size_t __gnu_cxx::char_traits<_CharT>::length(const char_type*) [with _CharT = char]	2
