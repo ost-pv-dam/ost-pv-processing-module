@@ -1,3 +1,4 @@
+#include <array>
 #include "ESP32.hpp"
 
 void ESP32::send_cmd(const std::string& cmd, bool crlf) {
@@ -15,6 +16,10 @@ void ESP32::send_cmd(const std::string& cmd, bool crlf) {
 
 void ESP32::send_raw(std::unique_ptr<char[]>&& cmd) {
 	HAL_UART_Transmit(&huart, (uint8_t*) cmd.get(), std::strlen(cmd.get()), 100);
+}
+
+void ESP32::send_raw(std::array<uint8_t, 512> buffer) {
+    HAL_UART_Transmit(&huart, (uint8_t*) buffer.data(), buffer.size(), 100);
 }
 
 int ESP32::init() {
@@ -88,12 +93,14 @@ std::string ESP32::poll(int num_bytes, uint32_t timeout) {
 }
 
 
-void ESP32::send_data_packet_start(size_t json_length) {
+void ESP32::send_data_packet_start(size_t json_length,
+                                   const std::string& url,
+                                   const std::string& content_type) {
 	std::ostringstream postCmd;
 
-	postCmd << "AT+HTTPCPOST=\"https://api.umich-ost-pv-dam.org:5050/api/v1/sensorCellData\",";
+	postCmd << "AT+HTTPCPOST=\"" << url << "\",";
 	postCmd << json_length;
-	postCmd << ",2,\"connection: keep-alive\",\"content-type: application/json\"";
+	postCmd << ",2,\"connection: keep-alive\",\"content-type: " << content_type << "\"";
 
 	send_cmd(postCmd.str());
 }

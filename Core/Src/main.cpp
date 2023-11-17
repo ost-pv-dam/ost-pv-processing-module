@@ -27,7 +27,6 @@
 #include "stdio.h"
 #include "string.h"
 #include <string>
-#include <sstream>
 
 #include "SHT30.hpp"
 #include "selector.hpp"
@@ -35,15 +34,15 @@
 #include "ESP32.hpp"
 #include "data.hpp"
 #include "SMU.hpp"
+#include "VC0706.hpp"
 #include "real_time_clock.hpp"
 #include "MPL3115A2.hpp"
 #include "thermistor_array.hpp"
-#include <stdexcept>
 #include <optional>
+#include <cmath>
 
 extern "C" {
 	#include "ff_gen_drv.h"
-
 }
 /* USER CODE END Includes */
 
@@ -168,13 +167,14 @@ std::unordered_map<uint8_t, uint8_t> panels = {
 };
 
 /* PERIPHERALS */
-Logger logger(huart4, LogLevel::Debug);
+Logger logger(huart4, LogLevel::Debug); // TODO: change uart
 SHT30 sht(hi2c1);
 MPL3115A2 pressure_sensor(hi2c2);
 Selector selector(panels, 7U, {GPIOD, GPIO_PIN_12}, {GPIOD, GPIO_PIN_13}, {GPIOD, GPIO_PIN_14});
 ESP32 esp(huart2, esp_messages_sem, esp_data_ready_sem);
 SMU smu(huart6);
 ThermistorArray thermistor_array(&hadc1, 1);
+VC0706 camera(&huart4);
 
 /* CONSTANTS */
 static constexpr uint32_t SCHEDULED_UPLOAD_PERIOD_MS = 15 * 60 * 1000;
@@ -917,6 +917,40 @@ void SmuUsartRxTask(void* arg) {
 	}
 }
 
+int update_photo() {
+
+    if (!camera.take_picture()) {
+        Error_Handler();
+    }
+
+    uint32_t jpg_size = camera.frameLength();
+    // TODO: change URL parameter to image endpoint
+    esp.send_data_packet_start(static_cast<size_t>(jpg_size),
+                               "https://api.umich-ost-pv-dam.org:5050/api/v1/sensorCellData",
+                               "image/jpeg");
+
+    osSemaphoreAcquire(esp_data_ready_sem, osWaitForever);
+
+    // TODO: send data in chunks with esp.send_raw (need to overload to take ref to std::array)
+
+    const int num_chunks = 4;
+    const int chunk_size = std::ceil(jpg_size / num_chunks);
+
+    for (int chunk = 0; chunk < num_chunks; ++chunk) {
+        uint8_t *buffer;
+        while (chunk_size > 0) {
+            // read 32 bytes at a time;
+            uint8_t bytesToRead = std::min((uint32_t) 32, jpg_size); // change 32 to 64 for a speedup but may not work with all setups!
+            buffer = camera.read_picture(bytesToRead);
+
+            jpg_size -= bytesToRead;
+        }
+
+        // send first chunk to esp
+
+    }
+}
+
 void update_data() {
 	logger.debug(std::to_string(xPortGetFreeHeapSize()));
 	osMutexAcquire(data_packet_mutex, osWaitForever);
@@ -1216,7 +1250,7 @@ void StartDefaultTask(void *argument)
 	    HAL_UART_Transmit(&huart1, (uint8_t*) msg, sizeof(msg), 100);
 	    if (!sht.init()) {
 	  	  logger.error("SHT30 init FAIL");
-	  	  return 0;
+            Error_Handler();
 	    }
 
 	    logger.info("SHT30 init OK");
@@ -1225,7 +1259,7 @@ void StartDefaultTask(void *argument)
 	  #ifdef PRESSURE_D
 	    if (pressure_sensor.init() != HAL_OK) {
 	  	  logger.error("Pressure sensor init FAIL");
-	  	  return 0;
+            Error_Handler();
 	    } else {
 	  	  logger.info("Pressure sensor init OK");
 	    }
@@ -1237,7 +1271,20 @@ void StartDefaultTask(void *argument)
 
 	  #ifdef SMU_D
 	    smu.config_voltage_sweep();
-	  #endif
+      #endif
+
+      if (!camera.begin()) {
+          // camera failed to initialize
+          logger.error("Camera init FAIL");
+          Error_Handler();
+      } else {
+          logger.info("Camera init SUCCESS");
+      }
+
+      if (!camera.set_image_size(VC0706_640x480)) {
+          logger.error("Camera unable to set image size");
+          Error_Handler();
+      }
 
         HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);
         HAL_NVIC_EnableIRQ(USART2_IRQn);
