@@ -13,6 +13,10 @@ void ESP32::send_cmd(const std::string& cmd, bool crlf) {
 	}
 }
 
+void ESP32::send_raw(std::unique_ptr<char[]>&& cmd) {
+	HAL_UART_Transmit(&huart, (uint8_t*) cmd.get(), std::strlen(cmd.get()), 100);
+}
+
 int ESP32::init() {
 	// AT+RESTORE restarts the module, so the timing is hard to get right
 	// will not include for now

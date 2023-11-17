@@ -815,17 +815,12 @@ void ScheduledUpdateUploadTask(void* argument) {
 
 		esp.flush();
 
-//		esp.send_cmd("AT+SYSRAM?");
-//		osMessageQueueGet(esp_messages_queue, &d, NULL, osWaitForever);
-//		esp_resp = esp.consume_message();
-//		logger.info("ESP RAM: " + esp_resp);
-
 		data_packet.serialize_json();
-		logger.debug("JSON length: " + std::to_string(data_packet.json.chunks().size()));
+		logger.debug("JSON length: " + std::to_string(data_packet.json.size()));
 
 		logger.debug(std::to_string(xPortGetFreeHeapSize()));
 
-		esp.send_data_packet_start(data_packet.json.chunks().size());
+		esp.send_data_packet_start(data_packet.json.size());
 
 		osSemaphoreAcquire(esp_messages_sem, osWaitForever);
 		esp_resp = esp.consume_message();
@@ -837,7 +832,7 @@ void ScheduledUpdateUploadTask(void* argument) {
 		osSemaphoreAcquire(esp_data_ready_sem, osWaitForever);
 
         while (!data_packet.json.chunks().empty()) {
-            esp.send_cmd(data_packet.json.chunks().front(), false);
+        	esp.send_raw(std::move(data_packet.json.chunks().front()));
             data_packet.json.chunks().pop_front();
         }
 
@@ -911,7 +906,7 @@ void SmuUsartRxTask(void* arg) {
 			CurrentVoltagePair pair {current, voltage};
 
 			// push the CurrentVoltagePair to your data structure
-			data_packet.iv_curves[curr_cell_id].push_back(pair);
+			data_packet.iv_curves[curr_cell_id].push(pair);
 			if (data_packet.iv_curves[curr_cell_id].size() == 141) {
 				osSemaphoreRelease(smu_done_sem);
 			}
@@ -995,9 +990,9 @@ void update_data() {
 #endif
 #else // no SMU, even if we have selector we have to generate fake data
 	for (auto& el : panels) {
-		data_packet.iv_curves[el.first] = std::vector<CurrentVoltagePair>();
+		data_packet.iv_curves[el.first] = std::queue<CurrentVoltagePair>();
 		for (size_t i = 0; i < 141; i++) {
-			data_packet.iv_curves[el.first].push_back({"-6.0E+00", "-3.0E+00"});
+			data_packet.iv_curves[el.first].push({"-6.000000E+00", "-3.000000E+00"});
 		}
 	}
 #endif
@@ -1254,10 +1249,12 @@ void StartDefaultTask(void *argument)
 
       esp.send_cmd("AT+CIPSNTPCFG=1,-5,\"time.nist.gov\"");
 
-      auto msg_status = osSemaphoreAcquire(esp_messages_sem, 10000U);
+      osSemaphoreAcquire(esp_messages_sem, 500U);
 
-      if (msg_status == osErrorTimeout || esp.consume_message().find("+TIME_UPDATED") == std::string::npos) {
-          logger.warn("ESP clock not synced with NTP");
+      if (esp.consume_message().find(ESP_OK) == std::string::npos) {
+          logger.warn("ESP NTP command failed");
+      } else {
+    	  osDelay(5000U); // TODO: modify esp message queue to include +TIME_UPDATED somehow
       }
 
       scheduledSendTaskHandle = osThreadNew(ScheduledUpdateUploadTask, NULL, &httpTask_attributes);

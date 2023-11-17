@@ -1,6 +1,7 @@
 #include "data.hpp"
 
 void DataPacket::serialize_json() {
+	HeapStats_t stats;
 	json += "{";
 	json += get_json_key("timestamp") + std::to_string(timestamp) + ",";
 	json += get_json_key("ambient_temp") + std::to_string(ambient_temp) + ",";
@@ -9,22 +10,21 @@ void DataPacket::serialize_json() {
 	json += get_json_key("iv_curves") += "{";
 
 	for (auto it = iv_curves.begin(); it != iv_curves.end(); it++) {
-		Logger::getInstance()->debug(std::to_string(xPortGetFreeHeapSize()));
 		json += get_json_key(std::to_string(it->first)) += "["; // panel ID
-		for (size_t i = 0; i < it->second.size(); i++) {
-			const CurrentVoltagePair& reading = it->second[i];
-			json += "{";
-			json += get_json_key("v") + reading.voltage + ",";
-			json += get_json_key("c") + reading.current;
-			json += "}";
 
-			if (i < it->second.size() - 1) { // no trailing comma
+		while (!it->second.empty()) {
+			const CurrentVoltagePair& reading = it->second.front();
+			json += "{" + get_json_key("v") + reading.voltage + "," + get_json_key("c") + reading.current + "}";
+
+			if (it->second.size() > 1) { // no trailing comma
 				json += ",";
 			}
+
+			it->second.pop();
 		}
 
 		// VERY IMPORTANT: will run out of heap otherwise
-		it->second = std::vector<CurrentVoltagePair>();
+		it->second = std::queue<CurrentVoltagePair>();
 
 		json += "]";
 		if (std::next(it) != iv_curves.end()) { // don't include trailing comma
@@ -48,7 +48,7 @@ void DataPacket::serialize_json() {
 }
 
 void DataPacket::clear() {
-	iv_curves = std::unordered_map<uint8_t, std::vector<CurrentVoltagePair>>();
+	iv_curves = std::unordered_map<uint8_t, std::queue<CurrentVoltagePair>>();
 	cell_temperatures = std::unordered_map<uint8_t, double>();
 	json = JsonBuilder();
 }
