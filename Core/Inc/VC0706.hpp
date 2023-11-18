@@ -12,6 +12,8 @@
 #include <array>
 #include "stdio.h"
 #include "stm32f4xx_hal.h"
+#include "cmsis_os.h"
+#include "main.h"
 
 #define VC0706_RESET 				0x26
 #define VC0706_GEN_VERSION 			0x11
@@ -61,7 +63,7 @@
 
 class VC0706 {
 public:
-    VC0706(UART_HandleTypeDef *huart);
+    VC0706(UART_HandleTypeDef *huart, osSemaphoreId_t* rx_sem);
 
     bool begin();
 
@@ -84,6 +86,7 @@ public:
     uint8_t buffer_len;
     uint32_t frame_ptr;
     UART_HandleTypeDef *huart;
+    osSemaphoreId_t* rx_sem;
 
 private:
 

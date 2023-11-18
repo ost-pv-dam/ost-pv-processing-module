@@ -119,6 +119,8 @@ osMessageQueueId_t smu_data_rx_queue;
 osSemaphoreId_t esp_data_ready_sem;
 osSemaphoreId_t esp_messages_sem;
 
+osSemaphoreId_t camera_rx_complete;
+
 osSemaphoreId_t smu_done_sem;
 osSemaphoreId_t adc_done_sem;
 
@@ -175,7 +177,7 @@ Selector selector(panels, 7U, {GPIOD, GPIO_PIN_12}, {GPIOD, GPIO_PIN_13}, {GPIOD
 ESP32 esp(huart2, esp_messages_sem, esp_data_ready_sem);
 SMU smu(huart6);
 ThermistorArray thermistor_array(&hadc1, 1);
-VC0706 camera(&huart4);
+VC0706 camera(&huart4, &camera_rx_complete);
 
 /* CONSTANTS */
 static constexpr uint32_t SCHEDULED_UPLOAD_PERIOD_MS = 15 * 60 * 1000;
@@ -299,6 +301,7 @@ int main(void)
   esp_data_ready_sem = osSemaphoreNew(1U, 0U, NULL);
   smu_done_sem = osSemaphoreNew(1U, 0U, NULL);
   adc_done_sem = osSemaphoreNew(1U, 0U, NULL);
+  camera_rx_complete = osSemaphoreNew(1U, 0U, NULL);
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -983,10 +986,7 @@ void update_photo() {
             size_t bytesToRead = std::min((uint32_t) 32, chunk_size);
             actually_read += bytesToRead;
             // copy camera data into buffer
-
-            osKernelSuspend();
             camera.read_picture(bytesToRead, buffer);
-            osKernelResume();
 
             chunk_size -= bytesToRead;
             HAL_Delay(1);
@@ -1261,7 +1261,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 		}
 
 		HAL_UART_Receive_IT(&smu.get_uart_handle(), &smu_usart_rx_buffer[smu_usart_pos], 1);
-	}
+	} else if (huart == camera.huart) {
+        osSemaphoreRelease(camera_rx_complete);
+    }
 }
 
 

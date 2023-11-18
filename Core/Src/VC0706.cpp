@@ -8,8 +8,9 @@
 
 #include "VC0706.hpp"
 
-VC0706::VC0706(UART_HandleTypeDef *huart) {
+VC0706::VC0706(UART_HandleTypeDef *huart, osSemaphoreId_t* rx_sem) {
     this->huart = huart;
+    this->rx_sem = rx_sem;
     frame_ptr = 0;
     buffer_len = 0;
     serial_num = 0;
@@ -159,14 +160,23 @@ uint8_t VC0706::read_response(uint16_t num_bytes, uint8_t timeout) {
 //        HAL_UART_Receive(this->huart, &data, 1, 0); // Non-blocking read to discard data
 //    }
     uint8_t data;
-    HAL_UART_Receive(this->huart, &data, 1, 0);
+//    HAL_UART_Receive(this->huart, &data, 1, 0);
+    HAL_UART_Receive_IT(this->huart, &data, 1);
+    auto res = osSemaphoreAcquire(rx_sem, 5000U);
 
-    result = HAL_UART_Receive(this->huart, camera_buff, num_bytes, HAL_MAX_DELAY);
-    if (result == HAL_OK) {
-        return num_bytes;
+    if (res != osOK) {
+        Error_Handler();
     }
 
-    return -1;
+//    result = HAL_UART_Receive(this->huart, camera_buff, num_bytes, HAL_MAX_DELAY);
+    HAL_UART_Receive_IT(this->huart, camera_buff, num_bytes);
+    res = osSemaphoreAcquire(rx_sem, 5000U);
+
+    if (res != osOK) {
+        Error_Handler();
+    }
+
+    return num_bytes;
 }
 
 
