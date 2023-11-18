@@ -9,6 +9,7 @@
 #define INC_VC0706_H_
 
 #include <stdint.h>
+#include <array>
 #include "stdio.h"
 #include "stm32f4xx_hal.h"
 
@@ -55,6 +56,7 @@
 
 #define CAMERABUFFSIZE 				100
 #define CAMERADELAY 				10
+#define CAMERACHUNKSIZE 			1024
 
 
 class VC0706 {
@@ -67,7 +69,7 @@ public:
 
     bool take_picture();
 
-    uint8_t* read_picture(uint8_t n);
+    void read_picture(size_t n, std::array<uint8_t, CAMERACHUNKSIZE>& arr);
 
     char* set_baud(uint32_t baud = 9600);
 
@@ -89,7 +91,7 @@ private:
 
     void send_command(uint8_t cmd, uint8_t args[], uint8_t argn);
 
-    uint8_t read_response(uint8_t num_bytes, uint8_t timeout);
+    uint8_t read_response(uint16_t num_bytes, uint8_t timeout);
 
     bool verify_response(uint8_t cmd);
 };
