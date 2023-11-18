@@ -18,7 +18,7 @@ void ESP32::send_raw(std::unique_ptr<char[]>&& cmd) {
 	HAL_UART_Transmit(&huart, (uint8_t*) cmd.get(), std::strlen(cmd.get()), 100);
 }
 
-void ESP32::send_raw(std::array<uint8_t, 512> buffer) {
+void ESP32::send_raw(std::array<uint8_t, ESP_PHOTO_CHUNK_LENGTH>& buffer) {
     HAL_UART_Transmit(&huart, (uint8_t*) buffer.data(), buffer.size(), 100);
 }
 
@@ -101,6 +101,22 @@ void ESP32::send_data_packet_start(size_t json_length,
 	postCmd << "AT+HTTPCPOST=\"" << url << "\",";
 	postCmd << json_length;
 	postCmd << ",2,\"connection: keep-alive\",\"content-type: " << content_type << "\"";
+
+	std::string tst = postCmd.str();
+
+	send_cmd(postCmd.str());
+}
+
+void ESP32::send_data_packet_start(size_t json_length,
+                                   const std::string& url,
+                                   const std::string& content_type, const time_t timestamp) {
+	std::ostringstream postCmd;
+
+	postCmd << "AT+HTTPCPOST=\"" << url << "\",";
+	postCmd << json_length;
+	postCmd << ",3,\"connection: keep-alive\",\"content-type: " << content_type << "\"" << ",\"x-timestamp: " << timestamp << "\"";
+
+	std::string tst = postCmd.str();
 
 	send_cmd(postCmd.str());
 }

@@ -88,6 +88,7 @@ DMA_HandleTypeDef hdma_sdio_tx;
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
+UART_HandleTypeDef huart3;
 UART_HandleTypeDef huart6;
 
 /* Definitions for defaultTask */
@@ -167,7 +168,7 @@ std::unordered_map<uint8_t, uint8_t> panels = {
 };
 
 /* PERIPHERALS */
-Logger logger(huart4, LogLevel::Debug); // TODO: change uart
+Logger logger(huart3, LogLevel::Debug); // TODO: change uart
 SHT30 sht(hi2c1);
 MPL3115A2 pressure_sensor(hi2c2);
 Selector selector(panels, 7U, {GPIOD, GPIO_PIN_12}, {GPIOD, GPIO_PIN_13}, {GPIOD, GPIO_PIN_14});
@@ -212,6 +213,7 @@ static void MX_USART2_UART_Init(void);
 static void MX_RTC_Init(void);
 static void MX_UART4_Init(void);
 static void MX_USART6_UART_Init(void);
+static void MX_USART3_UART_Init(void);
 void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -221,6 +223,7 @@ void RequestedUpdateUploadTask(void* argument);
 void EspUsartRxTask(void* arg);
 void SmuUsartRxTask(void* arg);
 
+void update_photo();
 void update_data();
 void sd_test();
 
@@ -264,12 +267,13 @@ int main(void)
   MX_USART1_UART_Init();
   MX_ADC1_Init();
   MX_I2C2_Init();
-//  MX_SDIO_SD_Init();
+  MX_SDIO_SD_Init();
   MX_USART2_UART_Init();
   MX_RTC_Init();
   MX_UART4_Init();
   MX_USART6_UART_Init();
-//  MX_FATFS_Init();
+  MX_FATFS_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
 
 
@@ -633,7 +637,7 @@ static void MX_UART4_Init(void)
 
   /* USER CODE END UART4_Init 1 */
   huart4.Instance = UART4;
-  huart4.Init.BaudRate = 115200;
+  huart4.Init.BaudRate = 38400;
   huart4.Init.WordLength = UART_WORDLENGTH_8B;
   huart4.Init.StopBits = UART_STOPBITS_1;
   huart4.Init.Parity = UART_PARITY_NONE;
@@ -717,6 +721,39 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
+  * @brief USART3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART3_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART3_Init 0 */
+
+  /* USER CODE END USART3_Init 0 */
+
+  /* USER CODE BEGIN USART3_Init 1 */
+
+  /* USER CODE END USART3_Init 1 */
+  huart3.Instance = USART3;
+  huart3.Init.BaudRate = 115200;
+  huart3.Init.WordLength = UART_WORDLENGTH_8B;
+  huart3.Init.StopBits = UART_STOPBITS_1;
+  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART3_Init 2 */
+
+  /* USER CODE END USART3_Init 2 */
+
+}
+
+/**
   * @brief USART6 Initialization Function
   * @param None
   * @retval None
@@ -787,10 +824,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_9|Panel0_Pin|Panel1_Pin|Panel2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, Panel0_Pin|Panel1_Pin|Panel2_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : PD9 Panel0_Pin Panel1_Pin Panel2_Pin */
-  GPIO_InitStruct.Pin = GPIO_PIN_9|Panel0_Pin|Panel1_Pin|Panel2_Pin;
+  /*Configure GPIO pins : Panel0_Pin Panel1_Pin Panel2_Pin */
+  GPIO_InitStruct.Pin = Panel0_Pin|Panel1_Pin|Panel2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -823,7 +860,7 @@ void ScheduledUpdateUploadTask(void* argument) {
 
 		esp.send_data_packet_start(data_packet.json.size());
 
-		osSemaphoreAcquire(esp_messages_sem, osWaitForever);
+		osSemaphoreAcquire(esp_messages_sem, 5000U);
 		esp_resp = esp.consume_message();
 
 		if (esp_resp.find(ESP_OK) == std::string::npos) {
@@ -843,6 +880,8 @@ void ScheduledUpdateUploadTask(void* argument) {
 		osSemaphoreAcquire(esp_messages_sem, 5000);
 		esp_resp = esp.consume_message();
 		logger.debug(esp_resp);
+
+		update_photo();
 
 		osDelayUntil(tick);
 	}
@@ -917,7 +956,7 @@ void SmuUsartRxTask(void* arg) {
 	}
 }
 
-int update_photo() {
+void update_photo() {
 
     if (!camera.take_picture()) {
         Error_Handler();
@@ -927,28 +966,37 @@ int update_photo() {
     // TODO: change URL parameter to image endpoint
     esp.send_data_packet_start(static_cast<size_t>(jpg_size),
                                "https://api.umich-ost-pv-dam.org:5050/api/v1/sensorCellData",
-                               "image/jpeg");
+                               "image/jpeg",
+							   data_packet.timestamp);
 
     osSemaphoreAcquire(esp_data_ready_sem, osWaitForever);
 
-    // TODO: send data in chunks with esp.send_raw (need to overload to take ref to std::array)
+    const int num_chunks = std::ceil(jpg_size / ESP_PHOTO_CHUNK_LENGTH);
 
-    const int num_chunks = 4;
-    const int chunk_size = std::ceil(jpg_size / num_chunks);
+    int actually_read = 0;
 
     for (int chunk = 0; chunk < num_chunks; ++chunk) {
-        uint8_t *buffer;
+        std::array<uint8_t, ESP_PHOTO_CHUNK_LENGTH>  buffer;
+        uint32_t chunk_size = ESP_PHOTO_CHUNK_LENGTH;
         while (chunk_size > 0) {
-            // read 32 bytes at a time;
-            uint8_t bytesToRead = std::min((uint32_t) 32, jpg_size); // change 32 to 64 for a speedup but may not work with all setups!
-            buffer = camera.read_picture(bytesToRead);
+            // read 32 or 64 bytes at a time
+            size_t bytesToRead = std::min((uint32_t) 32, chunk_size);
+            actually_read += bytesToRead;
+            // copy camera data into buffer
 
-            jpg_size -= bytesToRead;
+            osKernelSuspend();
+            camera.read_picture(bytesToRead, buffer);
+            osKernelResume();
+
+            chunk_size -= bytesToRead;
+            HAL_Delay(1);
         }
 
-        // send first chunk to esp
-
+         esp.send_raw(buffer);
     }
+
+    osSemaphoreAcquire(esp_messages_sem, 5000U);
+    std::string cool = esp.consume_message();
 }
 
 void update_data() {
@@ -1281,7 +1329,11 @@ void StartDefaultTask(void *argument)
           logger.info("Camera init SUCCESS");
       }
 
-      if (!camera.set_image_size(VC0706_640x480)) {
+      bool status = !camera.set_image_size(VC0706_640x480);
+
+      // HAL_Delay(1000);
+
+      if (!status) {
           logger.error("Camera unable to set image size");
           Error_Handler();
       }
