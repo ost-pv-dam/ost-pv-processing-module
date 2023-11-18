@@ -71,7 +71,7 @@ public:
 
     bool take_picture();
 
-    void read_picture(size_t n, std::array<uint8_t, CAMERACHUNKSIZE>& arr);
+    void read_picture(size_t n, std::array<uint8_t, CAMERACHUNKSIZE>& arr, uint32_t buffer_pos);
 
     char* set_baud(uint32_t baud = 9600);
 
@@ -87,6 +87,8 @@ public:
     uint32_t frame_ptr;
     UART_HandleTypeDef *huart;
     osSemaphoreId_t* rx_sem;
+
+    uint16_t current_num_bytes = 0;
 
 private:
 

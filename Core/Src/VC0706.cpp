@@ -32,7 +32,7 @@ bool VC0706::take_picture() {
     return result;
 }
 
-void VC0706::read_picture(size_t n, std::array<uint8_t, CAMERACHUNKSIZE>& arr) {
+void VC0706::read_picture(size_t n, std::array<uint8_t, CAMERACHUNKSIZE>& arr, uint32_t buffer_pos) {
     uint8_t args[] = {0x0C,
                       0x0,
                       0x0A, 	//MCU mode
@@ -55,9 +55,9 @@ void VC0706::read_picture(size_t n, std::array<uint8_t, CAMERACHUNKSIZE>& arr) {
     if (read_response(static_cast<uint16_t>(n + 5), CAMERADELAY) == 0)
     	return;
 
-    frame_ptr += n;
+    std::copy(std::begin(camera_buff), std::begin(camera_buff) + n, arr.begin() + buffer_pos);
 
-    std::copy(std::begin(camera_buff), std::end(camera_buff), arr.begin());
+    frame_ptr += n;
 }
 
 uint8_t VC0706::get_image_size() {
@@ -137,8 +137,8 @@ bool VC0706::run_command(uint8_t cmd, uint8_t *args, uint8_t argn, uint8_t respl
     uint8_t bytes_read = read_response(resplen, 200);
     if (bytes_read != resplen)
         return false;
-    if (!verify_response(cmd))
-        return false;
+//    if (!verify_response(cmd))
+//        return false;
 
     return true;
 }
@@ -155,26 +155,18 @@ void VC0706::send_command(uint8_t cmd, uint8_t args[], uint8_t argn) {
 
 uint8_t VC0706::read_response(uint16_t num_bytes, uint8_t timeout) {
     HAL_StatusTypeDef result;
-//    while (__HAL_UART_GET_FLAG(this->huart, UART_FLAG_RXNE)) {
-//        uint8_t data;
-//        HAL_UART_Receive(this->huart, &data, 1, 0); // Non-blocking read to discard data
-//    }
+
     uint8_t data;
-//    HAL_UART_Receive(this->huart, &data, 1, 0);
-    HAL_UART_Receive_IT(this->huart, &data, 1);
-    auto res = osSemaphoreAcquire(rx_sem, 5000U);
+    HAL_UART_Receive(this->huart, &data, 1, 0);
+
+    current_num_bytes = num_bytes;
+    result = HAL_UART_Receive_IT(this->huart, camera_buff, 1);
+    auto res = osSemaphoreAcquire(*rx_sem, 5000U);
 
     if (res != osOK) {
         Error_Handler();
     }
 
-//    result = HAL_UART_Receive(this->huart, camera_buff, num_bytes, HAL_MAX_DELAY);
-    HAL_UART_Receive_IT(this->huart, camera_buff, num_bytes);
-    res = osSemaphoreAcquire(rx_sem, 5000U);
-
-    if (res != osOK) {
-        Error_Handler();
-    }
 
     return num_bytes;
 }

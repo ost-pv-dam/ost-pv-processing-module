@@ -18,8 +18,8 @@ void ESP32::send_raw(std::unique_ptr<char[]>&& cmd) {
 	HAL_UART_Transmit(&huart, (uint8_t*) cmd.get(), std::strlen(cmd.get()), 100);
 }
 
-void ESP32::send_raw(std::array<uint8_t, ESP_PHOTO_CHUNK_LENGTH>& buffer) {
-    HAL_UART_Transmit(&huart, (uint8_t*) buffer.data(), buffer.size(), 100);
+void ESP32::send_raw(std::array<uint8_t, ESP_PHOTO_CHUNK_LENGTH>& buffer, uint32_t size) {
+    HAL_UART_Transmit(&huart, (uint8_t*) buffer.data(), size, 100);
 }
 
 int ESP32::init() {

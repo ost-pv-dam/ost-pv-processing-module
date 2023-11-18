@@ -27,7 +27,7 @@ public:
 	int init();
 	void send_cmd(const std::string& cmd, bool crlf = true);
 	void send_raw(std::unique_ptr<char[]>&& cmd);
-    void send_raw(std::array<uint8_t, ESP_PHOTO_CHUNK_LENGTH>& buffer);
+	void send_raw(std::array<uint8_t, ESP_PHOTO_CHUNK_LENGTH>& buffer, uint32_t size);
 	std::string poll(int num_bytes, uint32_t timeout = 1000);
 
 	void send_data_packet_start(size_t json_length,

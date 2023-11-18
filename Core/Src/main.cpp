@@ -974,29 +974,48 @@ void update_photo() {
 
     osSemaphoreAcquire(esp_data_ready_sem, osWaitForever);
 
-    const int num_chunks = std::ceil(jpg_size / ESP_PHOTO_CHUNK_LENGTH);
-
-    int actually_read = 0;
+    const int num_chunks = std::ceil(static_cast<double>(jpg_size) / ESP_PHOTO_CHUNK_LENGTH);
+    int jpg_remaining = jpg_size;
+    uint32_t actually_read = 0;
+    uint32_t bytesToSend = ESP_PHOTO_CHUNK_LENGTH;
 
     for (int chunk = 0; chunk < num_chunks; ++chunk) {
         std::array<uint8_t, ESP_PHOTO_CHUNK_LENGTH>  buffer;
         uint32_t chunk_size = ESP_PHOTO_CHUNK_LENGTH;
+        uint32_t buffer_pos = 0;
         while (chunk_size > 0) {
+        	if (jpg_remaining <= 0) {
+        		break;
+        	}
             // read 32 or 64 bytes at a time
-            size_t bytesToRead = std::min((uint32_t) 32, chunk_size);
-            actually_read += bytesToRead;
-            // copy camera data into buffer
-            camera.read_picture(bytesToRead, buffer);
+            size_t bytesToRead = std::min((uint32_t) 32, (uint32_t)jpg_remaining);
 
+            // copy camera data into buffer
+            camera.read_picture(bytesToRead, buffer, buffer_pos);
+
+            // update counters
+            actually_read += bytesToRead;
+            buffer_pos += bytesToRead;
             chunk_size -= bytesToRead;
+            jpg_remaining -= bytesToRead;
+
             HAL_Delay(1);
         }
 
-         esp.send_raw(buffer);
+        // send a different number of bytes on the last chunk
+        if (chunk == num_chunks - 1) {
+        	bytesToSend = jpg_size % ESP_PHOTO_CHUNK_LENGTH;
+        }
+        buffer_pos = 0;
+        esp.send_raw(buffer, bytesToSend);
     }
 
-    osSemaphoreAcquire(esp_messages_sem, 5000U);
+    osSemaphoreAcquire(esp_messages_sem, 15000U);
     std::string cool = esp.consume_message();
+
+    osSemaphoreAcquire(esp_messages_sem, 15000U);
+    cool = esp.consume_message();
+    cool;
 }
 
 void update_data() {
@@ -1262,7 +1281,15 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 		HAL_UART_Receive_IT(&smu.get_uart_handle(), &smu_usart_rx_buffer[smu_usart_pos], 1);
 	} else if (huart == camera.huart) {
-        osSemaphoreRelease(camera_rx_complete);
+		static size_t curr_cam_buf_pos = 0;
+		++curr_cam_buf_pos;
+
+		if (curr_cam_buf_pos >= camera.current_num_bytes) {
+			osSemaphoreRelease(camera_rx_complete);
+			curr_cam_buf_pos = 0;
+		} else {
+			auto hal_resp = HAL_UART_Receive_IT(camera.huart, &camera.camera_buff[curr_cam_buf_pos], 1);
+		}
     }
 }
 
@@ -1331,7 +1358,7 @@ void StartDefaultTask(void *argument)
           logger.info("Camera init SUCCESS");
       }
 
-      bool status = !camera.set_image_size(VC0706_640x480);
+      bool status = camera.set_image_size(VC0706_640x480);
 
       // HAL_Delay(1000);
 
