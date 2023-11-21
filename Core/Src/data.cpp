@@ -48,7 +48,7 @@ void DataPacket::serialize_json() {
 }
 
 void DataPacket::clear() {
-	iv_curves = std::unordered_map<uint8_t, std::queue<CurrentVoltagePair>>();
-	cell_temperatures = std::unordered_map<uint8_t, double>();
+	iv_curves = std::map<uint8_t, std::queue<CurrentVoltagePair>>();
+	cell_temperatures = std::map<uint8_t, double>();
 	json = JsonBuilder();
 }

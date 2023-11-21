@@ -2,7 +2,7 @@
 #define DATA_H
 
 #include <ctime>
-#include <unordered_map>
+#include <map>
 #include <vector>
 #include <sstream>
 #include <list>
@@ -53,8 +53,8 @@ struct DataPacket {
 	double ambient_temp;
 	double humidity;
 	double barometric_pressure;
-	std::unordered_map<uint8_t, std::queue<CurrentVoltagePair>> iv_curves;
-	std::unordered_map<uint8_t, double> cell_temperatures;
+	std::map<uint8_t, std::queue<CurrentVoltagePair>> iv_curves;
+	std::map<uint8_t, double> cell_temperatures;
 
 	void serialize_json();
 	JsonBuilder json;

@@ -57,7 +57,7 @@ struct BufferRange {
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 //#define SHT30_D
-//#define SELECTOR_D
+#define SELECTOR_D
 #define ESP32_D
 //#define SHT30_D
 //#define SMU_D
@@ -174,7 +174,7 @@ std::unordered_map<uint8_t, uint8_t> panels = {
 Logger logger(huart3, LogLevel::Debug); // TODO: change uart
 SHT30 sht(hi2c1);
 MPL3115A2 pressure_sensor(hi2c2);
-Selector selector(panels, 7U, {GPIOD, GPIO_PIN_12}, {GPIOD, GPIO_PIN_13}, {GPIOD, GPIO_PIN_14});
+Selector selector(panels, 7U, {GPIOE, GPIO_PIN_8}, {GPIOE, GPIO_PIN_9}, {GPIOE, GPIO_PIN_10});
 ESP32 esp(huart2, esp_messages_sem, esp_data_ready_sem);
 SMU smu(huart6);
 ThermistorArray thermistor_array(&hadc1, 1);
@@ -323,9 +323,6 @@ int main(void)
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-#ifdef SELECTOR_D
-  selectorTaskHandle = osThreadNew(SelectorCycleTask, NULL, &defaultTask_attributes);
-#endif
 
   const osThreadAttr_t processTask_attributes = {
     .name = "processTask",
@@ -824,11 +821,22 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOE, SEL0_Pin|SEL1_Pin|SEL2_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOD, Panel0_Pin|Panel1_Pin|Panel2_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : SEL0_Pin SEL1_Pin SEL2_Pin */
+  GPIO_InitStruct.Pin = SEL0_Pin|SEL1_Pin|SEL2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
   /*Configure GPIO pins : Panel0_Pin Panel1_Pin Panel2_Pin */
   GPIO_InitStruct.Pin = Panel0_Pin|Panel1_Pin|Panel2_Pin;
@@ -864,7 +872,10 @@ void ScheduledUpdateUploadTask(void* argument) {
 
 		esp.send_data_packet_start(data_packet.json.size());
 
-		osSemaphoreAcquire(esp_messages_sem, 5000U);
+		auto os_res = osSemaphoreAcquire(esp_messages_sem, 5000U);
+		if (os_res != osOK) {
+			Error_Handler();
+		}
 		esp_resp = esp.consume_message();
 
 		if (esp_resp.find(ESP_OK) == std::string::npos) {
@@ -872,7 +883,7 @@ void ScheduledUpdateUploadTask(void* argument) {
 			Error_Handler();
 		}
 
-		auto os_res = osSemaphoreAcquire(esp_data_ready_sem, 10000U);
+		os_res = osSemaphoreAcquire(esp_data_ready_sem, 10000U);
 		if (os_res != osOK) {
 			Error_Handler();
 		}
@@ -885,7 +896,10 @@ void ScheduledUpdateUploadTask(void* argument) {
 		osSemaphoreRelease(esp_data_ready_sem);
 		data_packet.json = JsonBuilder();
 
-		osSemaphoreAcquire(esp_messages_sem, 5000);
+		os_res = osSemaphoreAcquire(esp_messages_sem, 5000);
+		if (os_res != osOK) {
+			Error_Handler();
+		}
 		esp_resp = esp.consume_message();
 		logger.debug(esp_resp);
 
@@ -1112,12 +1126,23 @@ void update_data() {
 	}
 #endif
 #else // no SMU, even if we have selector we have to generate fake data
+#ifdef SELECTOR_D
+		selector.deselect_all();
+#endif
 	for (auto& el : panels) {
+#ifdef SELECTOR_D
+		selector.select(el.first);
+#endif
 		data_packet.iv_curves[el.first] = std::queue<CurrentVoltagePair>();
 		for (size_t i = 0; i < 141; i++) {
 			data_packet.iv_curves[el.first].push({"-6.000000E+00", "-3.000000E+00"});
 		}
+		HAL_Delay(1000);
 	}
+
+#ifdef SELECTOR_D
+		selector.deselect_all();
+#endif
 #endif
 
 	osMutexRelease(data_packet_mutex);
