@@ -63,6 +63,7 @@ struct BufferRange {
 //#define SMU_D
 //#define PRESSURE_D
 #define THERMISTORS_D
+// #define CAMERA_D
 
 #define ARRAY_LEN(x)            (sizeof(x) / sizeof((x)[0]))
 /* USER CODE END PD */
@@ -180,7 +181,7 @@ ThermistorArray thermistor_array(&hadc1, 1);
 VC0706 camera(&huart4, &camera_rx_complete);
 
 /* CONSTANTS */
-static constexpr uint32_t SCHEDULED_UPLOAD_PERIOD_MS = 15 * 60 * 1000;
+static constexpr uint32_t SCHEDULED_UPLOAD_PERIOD_MS = 3 * 60 * 1000;
 
 /* BUFFERS */
 DataPacket data_packet;
@@ -868,9 +869,13 @@ void ScheduledUpdateUploadTask(void* argument) {
 
 		if (esp_resp.find(ESP_OK) == std::string::npos) {
 			logger.error("Unexpected HTTP start response: " + esp_resp);
+			Error_Handler();
 		}
 
-		osSemaphoreAcquire(esp_data_ready_sem, osWaitForever);
+		auto os_res = osSemaphoreAcquire(esp_data_ready_sem, 10000U);
+		if (os_res != osOK) {
+			Error_Handler();
+		}
 
         while (!data_packet.json.chunks().empty()) {
         	esp.send_raw(std::move(data_packet.json.chunks().front()));
@@ -884,7 +889,9 @@ void ScheduledUpdateUploadTask(void* argument) {
 		esp_resp = esp.consume_message();
 		logger.debug(esp_resp);
 
+#ifdef CAMERA_D
 		update_photo();
+#endif
 
 		osDelayUntil(tick);
 	}
@@ -960,17 +967,34 @@ void SmuUsartRxTask(void* arg) {
 }
 
 void update_photo() {
+	if (!camera.begin()) {
+		Error_Handler();
+	}
+
+	if (!camera.set_image_size(VC0706_640x480)) {
+		Error_Handler();
+	}
+
+	HAL_Delay(500);
 
     if (!camera.take_picture()) {
         Error_Handler();
     }
 
+
     uint32_t jpg_size = camera.frameLength();
-    // TODO: change URL parameter to image endpoint
+
+    esp.flush();
     esp.send_data_packet_start(static_cast<size_t>(jpg_size),
-                               "https://api.umich-ost-pv-dam.org:5050/api/v1/sensorCellData",
+                               "https://api.umich-ost-pv-dam.org:5050/api/v1/sensorCellData/uploadPhoto",
                                "image/jpeg",
 							   data_packet.timestamp);
+
+    osSemaphoreAcquire(esp_messages_sem, 10000U);
+    std::string esp_resp = esp.consume_message();
+    if (esp_resp.find(ESP_OK) == std::string::npos) {
+    	Error_Handler();
+    }
 
     osSemaphoreAcquire(esp_data_ready_sem, osWaitForever);
 
@@ -994,7 +1018,6 @@ void update_photo() {
             camera.read_picture(bytesToRead, buffer, buffer_pos);
 
             // update counters
-            actually_read += bytesToRead;
             buffer_pos += bytesToRead;
             chunk_size -= bytesToRead;
             jpg_remaining -= bytesToRead;
@@ -1008,14 +1031,12 @@ void update_photo() {
         }
         buffer_pos = 0;
         esp.send_raw(buffer, bytesToSend);
+        actually_read += bytesToSend;
     }
 
-    osSemaphoreAcquire(esp_messages_sem, 15000U);
-    std::string cool = esp.consume_message();
-
-    osSemaphoreAcquire(esp_messages_sem, 15000U);
-    cool = esp.consume_message();
-    cool;
+    osSemaphoreAcquire(esp_messages_sem, 10000U);
+    esp_resp = esp.consume_message();
+    esp_resp;
 }
 
 void update_data() {
@@ -1350,6 +1371,7 @@ void StartDefaultTask(void *argument)
 	    smu.config_voltage_sweep();
       #endif
 
+#ifdef CAMERA_D
       if (!camera.begin()) {
           // camera failed to initialize
           logger.error("Camera init FAIL");
@@ -1366,6 +1388,7 @@ void StartDefaultTask(void *argument)
           logger.error("Camera unable to set image size");
           Error_Handler();
       }
+#endif
 
         HAL_NVIC_SetPriority(USART2_IRQn, 5, 0);
         HAL_NVIC_EnableIRQ(USART2_IRQn);

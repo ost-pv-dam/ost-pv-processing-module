@@ -2,6 +2,7 @@
 "./Core/Src/MPL3115A2.o"
 "./Core/Src/SHT30.o"
 "./Core/Src/SMU.o"
+"./Core/Src/VC0706.o"
 "./Core/Src/data.o"
 "./Core/Src/freertos.o"
 "./Core/Src/logger.o"
