@@ -110,6 +110,7 @@ const osThreadAttr_t httpTask_attributes = {
 
 osThreadId_t selectorTaskHandle;
 osThreadId_t scheduledSendTaskHandle;
+osThreadId_t requestedSendTaskHandle;
 osThreadId_t processHandle;
 osThreadId_t smuProcessHandle;
 
@@ -119,6 +120,7 @@ osMessageQueueId_t smu_data_rx_queue;
 
 osSemaphoreId_t esp_data_ready_sem;
 osSemaphoreId_t esp_messages_sem;
+osSemaphoreId_t esp_poll_cmd_sem;
 
 osSemaphoreId_t camera_rx_complete;
 
@@ -226,6 +228,7 @@ void RequestedUpdateUploadTask(void* argument);
 void EspUsartRxTask(void* arg);
 void SmuUsartRxTask(void* arg);
 
+void update_upload();
 void update_photo();
 void update_data();
 void sd_test();
@@ -300,6 +303,7 @@ int main(void)
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   esp_messages_sem = osSemaphoreNew(10U, 0U, NULL);
   esp_data_ready_sem = osSemaphoreNew(1U, 0U, NULL);
+  esp_poll_cmd_sem = osSemaphoreNew(1U, 0U, NULL);
   smu_done_sem = osSemaphoreNew(1U, 0U, NULL);
   adc_done_sem = osSemaphoreNew(1U, 0U, NULL);
   camera_rx_complete = osSemaphoreNew(1U, 0U, NULL);
@@ -856,59 +860,28 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void ScheduledUpdateUploadTask(void* argument) {
 	uint32_t tick = osKernelGetTickCount();
-	std::string esp_resp;
 
 	for(;;) {
 		tick += SCHEDULED_UPLOAD_PERIOD_MS;
 
-		update_data();
+        esp.disconnect_control_server();
+        update_upload();
 
-		esp.flush();
-
-		data_packet.serialize_json();
-		logger.debug("JSON length: " + std::to_string(data_packet.json.size()));
-
-		logger.debug(std::to_string(xPortGetFreeHeapSize()));
-
-		esp.send_data_packet_start(data_packet.json.size());
-
-		auto os_res = osSemaphoreAcquire(esp_messages_sem, 5000U);
-		if (os_res != osOK) {
-			Error_Handler();
-		}
-		esp_resp = esp.consume_message();
-
-		if (esp_resp.find(ESP_OK) == std::string::npos) {
-			logger.error("Unexpected HTTP start response: " + esp_resp);
-			Error_Handler();
-		}
-
-		os_res = osSemaphoreAcquire(esp_data_ready_sem, 10000U);
-		if (os_res != osOK) {
-			Error_Handler();
-		}
-
-        while (!data_packet.json.chunks().empty()) {
-        	esp.send_raw(std::move(data_packet.json.chunks().front()));
-            data_packet.json.chunks().pop_front();
+        if (!esp.connect_to_control_server()) {
+            Error_Handler();
         }
-
-		osSemaphoreRelease(esp_data_ready_sem);
-		data_packet.json = JsonBuilder();
-
-		os_res = osSemaphoreAcquire(esp_messages_sem, 5000);
-		if (os_res != osOK) {
-			Error_Handler();
-		}
-		esp_resp = esp.consume_message();
-		logger.debug(esp_resp);
-
-#ifdef CAMERA_D
-		update_photo();
-#endif
 
 		osDelayUntil(tick);
 	}
+}
+
+void RequestedUpdateUploadTask(void* argumnent) {
+    for(;;) {
+        osSemaphoreAcquire(esp_poll_cmd_sem, osWaitForever);
+        osThreadSuspend(scheduledSendTaskHandle);
+        update_upload();
+        osThreadResume(scheduledSendTaskHandle);
+    }
 }
 
 void EspUsartRxTask(void* arg) {
@@ -978,6 +951,55 @@ void SmuUsartRxTask(void* arg) {
 			logger.error("Invalid SMU data sent to rx thread: " + data_str);
 		}
 	}
+}
+
+void update_upload() {
+    std::string esp_resp;
+    update_data();
+
+    esp.flush();
+
+    data_packet.serialize_json();
+    logger.debug("JSON length: " + std::to_string(data_packet.json.size()));
+
+    logger.debug(std::to_string(xPortGetFreeHeapSize()));
+
+    esp.send_data_packet_start(data_packet.json.size());
+
+    auto os_res = osSemaphoreAcquire(esp_messages_sem, 5000U);
+    if (os_res != osOK) {
+        Error_Handler();
+    }
+    esp_resp = esp.consume_message();
+
+    if (esp_resp.find(ESP_OK) == std::string::npos) {
+        logger.error("Unexpected HTTP start response: " + esp_resp);
+        Error_Handler();
+    }
+
+    os_res = osSemaphoreAcquire(esp_data_ready_sem, 10000U);
+    if (os_res != osOK) {
+        Error_Handler();
+    }
+
+    while (!data_packet.json.chunks().empty()) {
+        esp.send_raw(std::move(data_packet.json.chunks().front()));
+        data_packet.json.chunks().pop_front();
+    }
+
+    osSemaphoreRelease(esp_data_ready_sem);
+    data_packet.json = JsonBuilder();
+
+    os_res = osSemaphoreAcquire(esp_messages_sem, 5000);
+    if (os_res != osOK) {
+        Error_Handler();
+    }
+    esp_resp = esp.consume_message();
+    logger.debug(esp_resp);
+
+#ifdef CAMERA_D
+    update_photo();
+#endif
 }
 
 void update_photo() {
@@ -1281,6 +1303,47 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 					}
 				}
 
+                if (match) {
+                    goto add_to_queue; // this is ugly
+                }
+
+                match = true;
+
+                for (int i = 6; i >= 0; i--) {// ESP_ERROR length
+                    if (ESP_ERROR[i] != (char) esp_usart_rx_buffer[idx]) {
+                        match = false;
+                        break;
+                    }
+
+                    if (idx == 0) {
+                        idx = ESP_MAX_RESP_LENGTH-1;
+                    } else {
+                        --idx;
+                    }
+                }
+
+                if (match) {
+                    goto add_to_queue; // this is ugly
+                }
+
+                for (int i = 5; i >= 0; i--) {// ESP_POLL length
+                    if (ESP_POLL_CMD[i] != (char) esp_usart_rx_buffer[idx]) {
+                        match = false;
+                        break;
+                    }
+
+                    if (idx == 0) {
+                        idx = ESP_MAX_RESP_LENGTH-1;
+                    } else {
+                        --idx;
+                    }
+                }
+
+                if (match) {
+                    osSemaphoreRelease(esp_poll_cmd_sem);
+                }
+
+add_to_queue:
 				if (match) {
 					esp_buffer_range.end = esp_usart_pos;
 					osMessageQueuePut(esp_msg_rx_queue, &esp_buffer_range, 0U, 0U);
@@ -1435,6 +1498,7 @@ void StartDefaultTask(void *argument)
       }
 
       scheduledSendTaskHandle = osThreadNew(ScheduledUpdateUploadTask, NULL, &httpTask_attributes);
+      requestedSendTaskHandle = osThreadNew(RequestedUpdateUploadTask, NULL, &httpTask_attributes);
 	  osThreadSuspend(defaultTaskHandle);
   }
   /* USER CODE END 5 */
