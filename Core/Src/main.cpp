@@ -60,7 +60,7 @@ struct BufferRange {
 //#define SELECTOR_D
 #define ESP32_D
 //#define SHT30_D
-//#define SMU_D
+#define SMU_D
 //#define PRESSURE_D
 //#define THERMISTORS_D
 // #define CAMERA_D
