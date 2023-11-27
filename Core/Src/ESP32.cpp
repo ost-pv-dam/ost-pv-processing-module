@@ -130,13 +130,25 @@ std::string ESP32::consume_message() {
 	if (!messages.empty()) {
 		std::string msg = messages.front();
 		messages.pop();
+
+		if (msg.find("ERROR") != std::string::npos) {
+			Error_Handler();
+		}
+
 		return msg;
 	} else {
-		return "ERROR";
+		Error_Handler();
 	}
 }
 
 void ESP32::flush() {
-	osMessageQueueReset(external_queue);
-	std::queue<std::string>().swap(messages);
+	while (osSemaphoreGetCount(external_queue)) {
+		osSemaphoreAcquire(external_queue, 0);
+	}
+
+	while (osSemaphoreGetCount(data_ready_sem)) {
+		osSemaphoreAcquire(data_ready_sem, 0);
+	}
+
+	messages = std::queue<std::string>();
 }

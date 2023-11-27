@@ -1,5 +1,6 @@
 #include <optional>
 #include "real_time_clock.hpp"
+#include "main.h"
 
 std::optional<time_t> get_timestamp_from_api(std::string time_resp) {
 	size_t resp_pos = time_resp.find("+SYSTIMESTAMP:");

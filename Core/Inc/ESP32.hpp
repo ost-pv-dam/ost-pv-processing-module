@@ -8,6 +8,7 @@
 #include "data.hpp"
 #include "logger.hpp"
 #include <sstream>
+#include "main.h"
 
 constexpr const char* ESP_OK = "OK\r\n";
 constexpr const char* ESP_ERROR = "ERROR\r\n";
@@ -19,7 +20,7 @@ constexpr size_t LONG_CMD_THRESHOLD = 1000;
 const std::string ESP_API_HEADER = "x-api-key: test";
 constexpr const char* ESP_READY = "\r\n>";
 static const std::string CONTROL_SERVER_IP = "3.138.79.216";
-static const std::string CONTROL_SERVER_PORT = "5050";
+static const std::string CONTROL_SERVER_PORT = "5051";
 static const std::string CONTROL_SERVER_KEY = "IPQRph00_towrY9jxyFxtw";
 
 constexpr size_t ESP_MAX_RESP_LENGTH = 512; // probably good enough?
@@ -45,23 +46,53 @@ public:
 	                                   const std::string& content_type, const time_t timestamp);
 
     bool connect_to_control_server() {
-        std::string cmd = R"(AT+CIPSTART="TCP",")" + CONTROL_SERVER_IP + "\"," + CONTROL_SERVER_PORT;
+    	flush();
+
+    	std::string cmd = "AT+CIPSTART=\"TCP\",\"" + CONTROL_SERVER_IP + "\"," + CONTROL_SERVER_PORT;
         send_cmd(cmd);
+
+        auto os_res = osSemaphoreAcquire(external_queue, 5000U);
+        std::string esp_resp = consume_message();
+
+        osDelay(1000);
 
         cmd = "AT+CIPSEND=" + std::to_string(CONTROL_SERVER_KEY.size());
         send_cmd(cmd);
 
-        auto os_res = osSemaphoreAcquire(data_ready_sem, 5000U);
+        os_res = osSemaphoreAcquire(data_ready_sem, 5000U);
         if (os_res != osOK) {
             return false;
         }
 
         send_cmd(CONTROL_SERVER_KEY, false);
+
+
+        os_res = osSemaphoreAcquire(external_queue, 5000U);
+        if (os_res != osOK) {
+			return false;
+		}
+
+        esp_resp = consume_message();
+
+        connected_to_control_server = true;
         return true;
     }
 
     void disconnect_control_server() {
-        send_cmd("AT+CIPCLOSE");
+    	flush();
+    	if (!connected_to_control_server) {
+    		return;
+    	}
+
+    	send_cmd("AT+CIPCLOSE");
+
+    	auto os_res = osSemaphoreAcquire(external_queue, 5000U);
+		if (os_res != osOK) {
+			Error_Handler();
+		}
+
+		auto esp_resp = consume_message();
+    	connected_to_control_server = false;
     }
 
 	void push_message(std::string msg);
@@ -75,6 +106,7 @@ public:
 private:
 	UART_HandleTypeDef& huart;
 	std::queue<std::string> messages;
+	bool connected_to_control_server = false;
 
 	osSemaphoreId_t& external_queue;
 	osSemaphoreId_t& data_ready_sem;

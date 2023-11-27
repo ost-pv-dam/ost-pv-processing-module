@@ -57,12 +57,12 @@ struct BufferRange {
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 //#define SHT30_D
-#define SELECTOR_D
+//#define SELECTOR_D
 #define ESP32_D
 //#define SHT30_D
 //#define SMU_D
 //#define PRESSURE_D
-#define THERMISTORS_D
+//#define THERMISTORS_D
 // #define CAMERA_D
 
 #define ARRAY_LEN(x)            (sizeof(x) / sizeof((x)[0]))
@@ -183,7 +183,7 @@ ThermistorArray thermistor_array(&hadc1, 1);
 VC0706 camera(&huart4, &camera_rx_complete);
 
 /* CONSTANTS */
-static constexpr uint32_t SCHEDULED_UPLOAD_PERIOD_MS = 3 * 60 * 1000;
+static constexpr uint32_t SCHEDULED_UPLOAD_PERIOD_MS = 15 * 60 * 1000;
 
 /* BUFFERS */
 DataPacket data_packet;
@@ -863,14 +863,7 @@ void ScheduledUpdateUploadTask(void* argument) {
 
 	for(;;) {
 		tick += SCHEDULED_UPLOAD_PERIOD_MS;
-
-        esp.disconnect_control_server();
         update_upload();
-
-        if (!esp.connect_to_control_server()) {
-            Error_Handler();
-        }
-
 		osDelayUntil(tick);
 	}
 }
@@ -878,9 +871,7 @@ void ScheduledUpdateUploadTask(void* argument) {
 void RequestedUpdateUploadTask(void* argumnent) {
     for(;;) {
         osSemaphoreAcquire(esp_poll_cmd_sem, osWaitForever);
-        osThreadSuspend(scheduledSendTaskHandle);
         update_upload();
-        osThreadResume(scheduledSendTaskHandle);
     }
 }
 
@@ -954,7 +945,9 @@ void SmuUsartRxTask(void* arg) {
 }
 
 void update_upload() {
+	osMutexAcquire(data_packet_mutex, osWaitForever);
     std::string esp_resp;
+    esp.disconnect_control_server();
     update_data();
 
     esp.flush();
@@ -1000,6 +993,11 @@ void update_upload() {
 #ifdef CAMERA_D
     update_photo();
 #endif
+    if (!esp.connect_to_control_server()) {
+		Error_Handler();
+	}
+
+    osMutexRelease(data_packet_mutex);
 }
 
 void update_photo() {
@@ -1077,7 +1075,7 @@ void update_photo() {
 
 void update_data() {
 	logger.debug(std::to_string(xPortGetFreeHeapSize()));
-	osMutexAcquire(data_packet_mutex, osWaitForever);
+
 	data_packet.clear();
 
 	esp.flush();
@@ -1089,6 +1087,7 @@ void update_data() {
     if (timestamp) {
         data_packet.timestamp = timestamp.value();
     } else {
+    	Error_Handler();
         logger.warn("Unable to get timestamp from ESP RTC");
         data_packet.timestamp = 0; // what's a good fallback?
     }
@@ -1166,8 +1165,6 @@ void update_data() {
 		selector.deselect_all();
 #endif
 #endif
-
-	osMutexRelease(data_packet_mutex);
 
 	logger.debug(std::to_string(xPortGetFreeHeapSize()));
 }
@@ -1307,6 +1304,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
                     goto add_to_queue; // this is ugly
                 }
 
+                idx = esp_usart_pos;
                 match = true;
 
                 for (int i = 6; i >= 0; i--) {// ESP_ERROR length
@@ -1325,6 +1323,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
                 if (match) {
                     goto add_to_queue; // this is ugly
                 }
+
+                idx = esp_usart_pos;
+                match = true;
 
                 for (int i = 5; i >= 0; i--) {// ESP_POLL length
                     if (ESP_POLL_CMD[i] != (char) esp_usart_rx_buffer[idx]) {
