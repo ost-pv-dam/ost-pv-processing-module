@@ -60,7 +60,7 @@ struct BufferRange {
 //#define SELECTOR_D
 #define ESP32_D
 //#define SHT30_D
-//#define SMU_D
+#define SMU_D
 //#define PRESSURE_D
 //#define THERMISTORS_D
 // #define CAMERA_D
@@ -173,7 +173,7 @@ std::unordered_map<uint8_t, uint8_t> panels = {
 };
 
 /* PERIPHERALS */
-Logger logger(huart3, LogLevel::Debug); // TODO: change uart
+Logger logger(huart4, LogLevel::Debug); // TODO: change uart
 SHT30 sht(hi2c1);
 MPL3115A2 pressure_sensor(hi2c2);
 Selector selector(panels, 7U, {GPIOE, GPIO_PIN_8}, {GPIOE, GPIO_PIN_9}, {GPIOE, GPIO_PIN_10});
@@ -774,7 +774,7 @@ static void MX_USART6_UART_Init(void)
 
   /* USER CODE END USART6_Init 1 */
   huart6.Instance = USART6;
-  huart6.Init.BaudRate = 115200;
+  huart6.Init.BaudRate = 57600;
   huart6.Init.WordLength = UART_WORDLENGTH_8B;
   huart6.Init.StopBits = UART_STOPBITS_1;
   huart6.Init.Parity = UART_PARITY_NONE;
@@ -940,6 +940,7 @@ void SmuUsartRxTask(void* arg) {
 			}
 		} else {
 			logger.error("Invalid SMU data sent to rx thread: " + data_str);
+			Error_Handler();
 		}
 	}
 }
@@ -1137,13 +1138,12 @@ void update_data() {
 	}
 #else // smu, no selector (use connected panel for all panel IDs)
 	for (auto& el : panels) {
-		data_packet.iv_curves[el.first].reserve(141);
-	}
-
-	for (auto& el : panels) {
 		curr_cell_id = el.first; // panel ID
 		smu.run_voltage_sweep();
-		osSemaphoreAcquire(smu_done_sem, osWaitForever);
+		auto os_res = osSemaphoreAcquire(smu_done_sem, 45000U);
+		if (os_res != osOK) {
+			Error_Handler();
+		}
 	}
 #endif
 #else // no SMU, even if we have selector we have to generate fake data
@@ -1421,7 +1421,7 @@ void StartDefaultTask(void *argument)
 	    logger.debug("Init");
 
 	  #ifdef ESP32_D
-	    HAL_Delay(500); // allow ESP to finish any commands from before reset
+	    HAL_Delay(2000); // allow ESP to finish any commands from before reset
 	    if (!esp.init()) {
 	  	  logger.error("ESP32 init FAIL!");
 	    } else {
