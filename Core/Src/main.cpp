@@ -56,14 +56,14 @@ struct BufferRange {
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-//#define SHT30_D
-//#define SELECTOR_D
+#define SELECTOR_D
 #define ESP32_D
-//#define SHT30_D
+#define SHT30_D
 #define SMU_D
-//#define PRESSURE_D
-//#define THERMISTORS_D
-// #define CAMERA_D
+#define PRESSURE_D
+#define THERMISTORS_D
+#define CAMERA_D
+#define SD_D
 
 #define ARRAY_LEN(x)            (sizeof(x) / sizeof((x)[0]))
 /* USER CODE END PD */
@@ -958,6 +958,14 @@ void update_upload() {
 
     logger.debug(std::to_string(xPortGetFreeHeapSize()));
 
+#ifdef SD_D
+    std::string filename = std::to_string(data_packet.timestamp) + ".JSON";
+    if(auto res = f_open(&MyFile, filename.c_str(), FA_CREATE_ALWAYS | FA_WRITE); res != FR_OK)
+	{
+	  Error_Handler();
+	}
+#endif
+
     esp.send_data_packet_start(data_packet.json.size());
 
     auto os_res = osSemaphoreAcquire(esp_messages_sem, 5000U);
@@ -976,15 +984,26 @@ void update_upload() {
         Error_Handler();
     }
 
+    uint32_t byteswritten = 0;
+
     while (!data_packet.json.chunks().empty()) {
+#ifdef SD_D
+	  /*##-5- Write data to the text file ################################*/
+	  auto file_res = f_write(&MyFile, data_packet.json.chunks().front().get(), std::strlen(data_packet.json.chunks().front().get()), reinterpret_cast<UINT*>(&byteswritten));
+	  if((byteswritten == 0) || (file_res != FR_OK))
+	  {
+		Error_Handler();
+	  }
+#endif
         esp.send_raw(std::move(data_packet.json.chunks().front()));
         data_packet.json.chunks().pop_front();
     }
 
-    osSemaphoreRelease(esp_data_ready_sem);
+//    osSemaphoreRelease(esp_data_ready_sem);
     data_packet.json = JsonBuilder();
+    f_close(&MyFile);
 
-    os_res = osSemaphoreAcquire(esp_messages_sem, 5000);
+    os_res = osSemaphoreAcquire(esp_messages_sem, 10000);
     if (os_res != osOK) {
         Error_Handler();
     }
@@ -1137,14 +1156,14 @@ void update_data() {
 		osSemaphoreAcquire(smu_done_sem, osWaitForever);
 	}
 #else // smu, no selector (use connected panel for all panel IDs)
-	for (auto& el : panels) {
-		curr_cell_id = el.first; // panel ID
+//	for (auto& el : panels) {
+//		curr_cell_id = el.first; // panel ID
 		smu.run_voltage_sweep();
 		auto os_res = osSemaphoreAcquire(smu_done_sem, 45000U);
 		if (os_res != osOK) {
 			Error_Handler();
 		}
-	}
+//	}
 #endif
 #else // no SMU, even if we have selector we have to generate fake data
 #ifdef SELECTOR_D
@@ -1257,12 +1276,12 @@ void sd_test() {
 
 
 	  /*##-11- Unlink the RAM disk I/O driver ####################################*/
-	  FATFS_UnLinkDriver(SDPath);
+//	  FATFS_UnLinkDriver(SDPath);
 
 	  /* Infinite Loop */
-	  for( ;; )
-	  {
-	  }
+//	  for( ;; )
+//	  {
+//	  }
 }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
@@ -1420,10 +1439,18 @@ void StartDefaultTask(void *argument)
 	  Logger::registerInstance(&logger);
 	    logger.debug("Init");
 
+#ifdef SD_D
+	  sd_test();
+#endif
+
 	  #ifdef ESP32_D
 	    HAL_Delay(2000); // allow ESP to finish any commands from before reset
 	    if (!esp.init()) {
 	  	  logger.error("ESP32 init FAIL!");
+	  	  HAL_Delay(1000);
+	  	  if (!esp.init()) {
+	  		  Error_Handler();
+	  	  }
 	    } else {
 	  	  logger.info("ESP32 init SUCCESS");
 	    }
@@ -1490,7 +1517,7 @@ void StartDefaultTask(void *argument)
 
       esp.send_cmd("AT+CIPSNTPCFG=1,-5,\"time.nist.gov\"");
 
-      osSemaphoreAcquire(esp_messages_sem, 500U);
+      osSemaphoreAcquire(esp_messages_sem, 1500U);
 
       if (esp.consume_message().find(ESP_OK) == std::string::npos) {
           logger.warn("ESP NTP command failed");
