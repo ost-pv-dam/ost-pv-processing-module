@@ -179,7 +179,7 @@ MPL3115A2 pressure_sensor(hi2c2);
 Selector selector(panels, 7U, {GPIOE, GPIO_PIN_8}, {GPIOE, GPIO_PIN_9}, {GPIOE, GPIO_PIN_10});
 ESP32 esp(huart2, esp_messages_sem, esp_data_ready_sem);
 SMU smu(huart6);
-ThermistorArray thermistor_array(&hadc1, 1);
+ThermistorArray thermistor_array(&hadc1, 5);
 VC0706 camera(&huart4, &camera_rx_complete);
 
 /* CONSTANTS */
@@ -838,7 +838,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pins : SEL0_Pin SEL1_Pin SEL2_Pin */
   GPIO_InitStruct.Pin = SEL0_Pin|SEL1_Pin|SEL2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
@@ -1131,13 +1131,14 @@ void update_data() {
 
 #ifdef THERMISTORS_D
     thermistor_array.update();
-    osSemaphoreAcquire(adc_done_sem, osWaitForever);
-    data_packet.cell_temperatures[0] = thermistor_array.get_temperature_at(0);
-    logger.debug("Thermistor 0: " + std::to_string(data_packet.cell_temperatures[0]));
+    auto adc_os_res = osSemaphoreAcquire(adc_done_sem, 5000U);
+
+    if (adc_os_res != osOK) {
+    	Error_Handler();
+    }
 
     for (auto& el : panels) {
-        if (el.first == 0) continue;
-        data_packet.cell_temperatures[el.first] = 30.2;
+    	data_packet.cell_temperatures[el.first] = thermistor_array.get_temperature_at(el.first);
     }
 
 
@@ -1440,6 +1441,7 @@ void StartDefaultTask(void *argument)
 	    logger.debug("Init");
 
 #ifdef SD_D
+	  HAL_Delay(1000);
 	  sd_test();
 #endif
 

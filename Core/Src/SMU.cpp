@@ -16,7 +16,7 @@ void SMU::config_voltage_sweep() {
 	send_scpi(":SOUR:VOLT:STEP 0.05");
 	send_scpi(":TRIG:COUNT 141");
 	send_scpi(":FORM:ELEM CURR, VOLT");
-	send_scpi(":SENS:CURR:DC:PROT:LEV MAX");
+	send_scpi(":SENS:CURR:DC:PROT:LEV 100E-3");
 }
 
 void SMU::run_voltage_sweep() {
