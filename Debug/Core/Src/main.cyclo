@@ -45,9 +45,9 @@
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_vector.h:128:14:std::_Vector_base<long unsigned int, std::allocator<long unsigned int> >::_Vector_impl::~_Vector_impl()	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_vector.h:288:7:std::_Vector_base<_Tp, _Alloc>::_Vector_base() [with _Tp = long unsigned int; _Alloc = std::allocator<long unsigned int>]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/stl_vector.h:487:7:std::vector<_Tp, _Alloc>::vector() [with _Tp = long unsigned int; _Alloc = std::allocator<long unsigned int>]	1
-../Core/Inc/thermistor_array.hpp:20:5:ThermistorArray::ThermistorArray(ADC_HandleTypeDef*, std::size_t)	1
-../Core/Inc/thermistor_array.hpp:24:12:double ThermistorArray::get_temperature_at(std::size_t)	2
-../Core/Inc/thermistor_array.hpp:32:10:void ThermistorArray::update()	1
+../Core/Inc/thermistor_array.hpp:31:5:ThermistorArray::ThermistorArray(ADC_HandleTypeDef*, std::size_t)	1
+../Core/Inc/thermistor_array.hpp:35:12:double ThermistorArray::get_temperature_at(std::size_t)	2
+../Core/Inc/thermistor_array.hpp:55:10:void ThermistorArray::update()	1
 ../Core/Src/main.cpp:132:8:void* operator new(size_t)	2
 ../Core/Src/main.cpp:144:8:void* operator new [](size_t)	2
 ../Core/Src/main.cpp:155:6:void operator delete(void*)	1
@@ -69,32 +69,32 @@
 ../Core/Inc/data.hpp:50:8:DataPacket::DataPacket()	1
 ../Core/Src/main.cpp:247:5:int main()	3
 ../Core/Src/main.cpp:373:6:void SystemClock_Config()	4
-../Core/Src/main.cpp:426:13:void MX_ADC1_Init()	3
-../Core/Src/main.cpp:476:13:void MX_I2C1_Init()	2
-../Core/Src/main.cpp:510:13:void MX_I2C2_Init()	2
-../Core/Src/main.cpp:544:13:void MX_RTC_Init()	4
-../Core/Src/main.cpp:606:13:void MX_SDIO_SD_Init()	1
-../Core/Src/main.cpp:634:13:void MX_UART4_Init()	2
-../Core/Src/main.cpp:667:13:void MX_USART1_UART_Init()	2
-../Core/Src/main.cpp:700:13:void MX_USART2_UART_Init()	2
-../Core/Src/main.cpp:733:13:void MX_USART3_UART_Init()	2
-../Core/Src/main.cpp:766:13:void MX_USART6_UART_Init()	2
-../Core/Src/main.cpp:797:13:void MX_DMA_Init()	1
-../Core/Src/main.cpp:821:13:void MX_GPIO_Init()	1
-../Core/Src/main.cpp:861:6:void ScheduledUpdateUploadTask(void*)	1
-../Core/Src/main.cpp:871:6:void RequestedUpdateUploadTask(void*)	1
-../Core/Src/main.cpp:878:6:void EspUsartRxTask(void*)	6
+../Core/Src/main.cpp:426:13:void MX_ADC1_Init()	7
+../Core/Src/main.cpp:508:13:void MX_I2C1_Init()	2
+../Core/Src/main.cpp:542:13:void MX_I2C2_Init()	2
+../Core/Src/main.cpp:576:13:void MX_RTC_Init()	4
+../Core/Src/main.cpp:638:13:void MX_SDIO_SD_Init()	1
+../Core/Src/main.cpp:666:13:void MX_UART4_Init()	2
+../Core/Src/main.cpp:699:13:void MX_USART1_UART_Init()	2
+../Core/Src/main.cpp:732:13:void MX_USART2_UART_Init()	2
+../Core/Src/main.cpp:765:13:void MX_USART3_UART_Init()	2
+../Core/Src/main.cpp:798:13:void MX_USART6_UART_Init()	2
+../Core/Src/main.cpp:829:13:void MX_DMA_Init()	1
+../Core/Src/main.cpp:853:13:void MX_GPIO_Init()	1
+../Core/Src/main.cpp:893:6:void ScheduledUpdateUploadTask(void*)	1
+../Core/Src/main.cpp:903:6:void RequestedUpdateUploadTask(void*)	1
+../Core/Src/main.cpp:910:6:void EspUsartRxTask(void*)	6
 ../Core/Inc/data.hpp:16:8:CurrentVoltagePair::~CurrentVoltagePair()	1
-../Core/Src/main.cpp:897:6:void SmuUsartRxTask(void*)	25
+../Core/Src/main.cpp:929:6:void SmuUsartRxTask(void*)	25
 ../Core/Inc/data.hpp:21:7:JsonBuilder& JsonBuilder::operator=(JsonBuilder&&)	1
-../Core/Src/main.cpp:948:6:void update_upload()	40
-../Core/Src/main.cpp:1023:6:void update_photo()	16
-../Core/Src/main.cpp:1096:6:void update_data()	34
-../Core/Src/main.cpp:1192:6:void sd_test()	10
-../Core/Src/main.cpp:1288:6:void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef*)	1
-../Core/Src/main.cpp:1292:6:void HAL_UART_RxCpltCallback(UART_HandleTypeDef*)	30
-../Core/Src/main.cpp:1436:6:void StartDefaultTask(void*)	20
-../Core/Src/main.cpp:1541:6:void Error_Handler()	1
+../Core/Src/main.cpp:980:6:void update_upload()	40
+../Core/Src/main.cpp:1055:6:void update_photo()	16
+../Core/Src/main.cpp:1128:6:void update_data()	34
+../Core/Src/main.cpp:1224:6:void sd_test()	10
+../Core/Src/main.cpp:1320:6:void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef*)	1
+../Core/Src/main.cpp:1324:6:void HAL_UART_RxCpltCallback(UART_HandleTypeDef*)	30
+../Core/Src/main.cpp:1468:6:void StartDefaultTask(void*)	20
+../Core/Src/main.cpp:1573:6:void Error_Handler()	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/char_traits.h:106:7:static constexpr bool __gnu_cxx::char_traits<_CharT>::eq(const char_type&, const char_type&) [with _CharT = char]	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/char_traits.h:167:5:static constexpr std::size_t __gnu_cxx::char_traits<_CharT>::length(const char_type*) [with _CharT = char]	2
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/bits/charconv.h:47:5:constexpr unsigned int std::__detail::__to_chars_len(_Tp, int) [with _Tp = unsigned int]	5
@@ -653,10 +653,10 @@
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/optional:93:13:std::bad_optional_access::~bad_optional_access()	1
 /Applications/STM32CubeIDE.app/Contents/Eclipse/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.11.3.rel1.macos64_1.1.1.202309131626/tools/arm-none-eabi/include/c++/11.3.1/optional:93:13:virtual std::bad_optional_access::~bad_optional_access()	1
 ../Core/Inc/data.hpp:50:8:DataPacket::~DataPacket()	1
-../Core/Inc/thermistor_array.hpp:17:7:ThermistorArray::~ThermistorArray()	1
+../Core/Inc/thermistor_array.hpp:28:7:ThermistorArray::~ThermistorArray()	1
 ../Core/Inc/ESP32.hpp:29:7:ESP32::~ESP32()	1
 ../Core/Inc/selector.hpp:14:7:Selector::~Selector()	1
 ../Core/Inc/logger.hpp:14:7:Logger::~Logger()	1
-../Core/Src/main.cpp:1550:1:void __static_initialization_and_destruction_0(int, int)	6
-../Core/Src/main.cpp:1550:1:cpp)	1
-../Core/Src/main.cpp:1550:1:cpp)	1
+../Core/Src/main.cpp:1582:1:void __static_initialization_and_destruction_0(int, int)	6
+../Core/Src/main.cpp:1582:1:cpp)	1
+../Core/Src/main.cpp:1582:1:cpp)	1
