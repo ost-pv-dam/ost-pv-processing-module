@@ -1,3 +1,4 @@
+#include <array>
 #include "ESP32.hpp"
 
 void ESP32::send_cmd(const std::string& cmd, bool crlf) {
@@ -11,6 +12,14 @@ void ESP32::send_cmd(const std::string& cmd, bool crlf) {
 			HAL_UART_Transmit(&huart, (uint8_t*) cmd.c_str(), cmd.length(), 100);
 		}
 	}
+}
+
+void ESP32::send_raw(std::unique_ptr<char[]>&& cmd) {
+	HAL_UART_Transmit(&huart, (uint8_t*) cmd.get(), std::strlen(cmd.get()), 100);
+}
+
+void ESP32::send_raw(std::array<uint8_t, ESP_PHOTO_CHUNK_LENGTH>& buffer, uint32_t size) {
+    HAL_UART_Transmit(&huart, (uint8_t*) buffer.data(), size, 100);
 }
 
 int ESP32::init() {
@@ -84,33 +93,62 @@ std::string ESP32::poll(int num_bytes, uint32_t timeout) {
 }
 
 
-void ESP32::send_data_packet_start(size_t json_length) {
+void ESP32::send_data_packet_start(size_t json_length,
+                                   const std::string& url,
+                                   const std::string& content_type) {
 	std::ostringstream postCmd;
 
-	postCmd << "AT+HTTPCPOST=\"http://18.220.103.162:5050/api/v1/sensorCellData\",";
+	postCmd << "AT+HTTPCPOST=\"" << url << "\",";
 	postCmd << json_length;
-	postCmd << ",2,\"connection: keep-alive\",\"content-type: application/json\"";
+	postCmd << ",2,\"connection: keep-alive\",\"content-type: " << content_type << "\"";
+
+	std::string tst = postCmd.str();
+
+	send_cmd(postCmd.str());
+}
+
+void ESP32::send_data_packet_start(size_t json_length,
+                                   const std::string& url,
+                                   const std::string& content_type, const time_t timestamp) {
+	std::ostringstream postCmd;
+
+	postCmd << "AT+HTTPCPOST=\"" << url << "\",";
+	postCmd << json_length;
+	postCmd << ",3,\"connection: keep-alive\",\"content-type: " << content_type << "\"" << ",\"x-timestamp: " << timestamp << "\"";
+
+	std::string tst = postCmd.str();
 
 	send_cmd(postCmd.str());
 }
 
 void ESP32::push_message(std::string msg) {
 	messages.push(msg);
-	void* d = (void *)1;
-	osMessageQueuePut(external_queue, &d, 0, 0);
+	osSemaphoreRelease(external_queue);
 }
 
 std::string ESP32::consume_message() {
 	if (!messages.empty()) {
 		std::string msg = messages.front();
 		messages.pop();
+
+		if (msg.find("ERROR") != std::string::npos) {
+			Error_Handler();
+		}
+
 		return msg;
 	} else {
-		return "ERROR: someone tried to consume from an empty message queue";
+		Error_Handler();
 	}
 }
 
 void ESP32::flush() {
-	osMessageQueueReset(external_queue);
-	std::queue<std::string>().swap(messages);
+	while (osSemaphoreGetCount(external_queue)) {
+		osSemaphoreAcquire(external_queue, 0);
+	}
+
+	while (osSemaphoreGetCount(data_ready_sem)) {
+		osSemaphoreAcquire(data_ready_sem, 0);
+	}
+
+	messages = std::queue<std::string>();
 }

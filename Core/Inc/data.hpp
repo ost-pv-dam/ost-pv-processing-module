@@ -1,22 +1,47 @@
-/*
- * solar_processing_structs.h
- *
- *  Created on: Oct 4, 2023
- *      Author: adarsh
- */
-
 #ifndef DATA_H
 #define DATA_H
 
-#include <time.h>
-#include <unordered_map>
+#include <ctime>
+#include <map>
 #include <vector>
 #include <sstream>
+#include <list>
+#include "cmsis_os.h"
+#include "logger.hpp"
+#include <queue>
+#include <memory>
+#include <cstring>
 
 /* measured cell voltage for the supplied current */
 struct CurrentVoltagePair {
-	double voltage;
-	double current;
+	std::string current;
+	std::string voltage;
+};
+
+class JsonBuilder {
+public:
+    JsonBuilder() = default;
+
+    JsonBuilder& operator+=(const std::string& str) {
+    	auto allocated = std::make_unique<char[]>(str.size()+1); // include null term.
+    	m_size += str.size();
+    	std::strcpy(allocated.get(), str.c_str());
+
+        data.push_back(std::move(allocated));
+        return *this;
+    }
+
+    std::list<std::unique_ptr<char[]>>& chunks() {
+        return data;
+    }
+
+    size_t size() {
+    	return m_size;
+    }
+
+private:
+    std::list<std::unique_ptr<char[]>> data;
+    size_t m_size{};
 };
 
 
@@ -28,30 +53,18 @@ struct DataPacket {
 	double ambient_temp;
 	double humidity;
 	double barometric_pressure;
-	std::unordered_map<uint8_t, std::vector<CurrentVoltagePair>> iv_curves;
-	std::unordered_map<uint8_t, double> cell_temperatures;
+	std::map<uint8_t, std::queue<CurrentVoltagePair>> iv_curves;
+	std::map<uint8_t, double> cell_temperatures;
 
 	void serialize_json();
-	std::string serialized_json;
+	JsonBuilder json;
+
+	void clear();
 
 private:
-	std::ostringstream json;
 	static std::string get_json_key(std::string field) {
 		return "\"" + field + "\": ";
 	}
 };
-
-
-
-/*
-enum ErrorCode {
-    NO_ERROR = 0,
-    ERROR_INVALID_PARAMETER,
-    ERROR_TIMEOUT,
-	ERROR_HAL,
-    // Add more error codes as needed
-
-}
-*/
 
 #endif /* DATA_H */

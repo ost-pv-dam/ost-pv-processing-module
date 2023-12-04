@@ -8,15 +8,23 @@
 #include "data.hpp"
 #include "logger.hpp"
 #include <sstream>
+#include "main.h"
 
 constexpr const char* ESP_OK = "OK\r\n";
+constexpr const char* ESP_ERROR = "ERROR\r\n";
+constexpr const char* ESP_POLL_CMD = "POLL\r\n";
+
 const std::string ESP_WIFI_OK = "WIFI GOT IP\r\n";
 constexpr uint16_t ESP_RESP_LEN = 50;
 constexpr size_t LONG_CMD_THRESHOLD = 1000;
 const std::string ESP_API_HEADER = "x-api-key: test";
 constexpr const char* ESP_READY = "\r\n>";
+static const std::string CONTROL_SERVER_IP = "3.138.79.216";
+static const std::string CONTROL_SERVER_PORT = "5051";
+static const std::string CONTROL_SERVER_KEY = "IPQRph00_towrY9jxyFxtw";
 
-constexpr size_t ESP_MAX_RESP_LENGTH = 800; // probably good enough?
+constexpr size_t ESP_MAX_RESP_LENGTH = 512; // probably good enough?
+constexpr size_t ESP_PHOTO_CHUNK_LENGTH = 1024;
 
 class ESP32 {
 public:
@@ -25,19 +33,82 @@ public:
 
 	int init();
 	void send_cmd(const std::string& cmd, bool crlf = true);
-	std::string poll(int num_bytes, uint32_t timeout = 100);
+	void send_raw(std::unique_ptr<char[]>&& cmd);
+	void send_raw(std::array<uint8_t, ESP_PHOTO_CHUNK_LENGTH>& buffer, uint32_t size);
+	std::string poll(int num_bytes, uint32_t timeout = 1000);
 
-	void send_data_packet_start(size_t json_length);
+	void send_data_packet_start(size_t json_length,
+                                const std::string& url = "https://api.umich-ost-pv-dam.org:5050/api/v1/sensorCellData",
+                                const std::string& content_type = "application/json");
+
+	void send_data_packet_start(size_t json_length,
+	                                   const std::string& url,
+	                                   const std::string& content_type, const time_t timestamp);
+
+    bool connect_to_control_server() {
+    	flush();
+
+    	std::string cmd = "AT+CIPSTART=\"TCP\",\"" + CONTROL_SERVER_IP + "\"," + CONTROL_SERVER_PORT;
+        send_cmd(cmd);
+
+        auto os_res = osSemaphoreAcquire(external_queue, 5000U);
+        std::string esp_resp = consume_message();
+
+        osDelay(1000);
+
+        cmd = "AT+CIPSEND=" + std::to_string(CONTROL_SERVER_KEY.size());
+        send_cmd(cmd);
+
+        os_res = osSemaphoreAcquire(data_ready_sem, 5000U);
+        if (os_res != osOK) {
+            return false;
+        }
+
+        send_cmd(CONTROL_SERVER_KEY, false);
+
+
+        os_res = osSemaphoreAcquire(external_queue, 5000U);
+        if (os_res != osOK) {
+			return false;
+		}
+
+        esp_resp = consume_message();
+
+        connected_to_control_server = true;
+        return true;
+    }
+
+    void disconnect_control_server() {
+    	flush();
+    	if (!connected_to_control_server) {
+    		return;
+    	}
+
+    	send_cmd("AT+CIPCLOSE");
+
+    	auto os_res = osSemaphoreAcquire(external_queue, 5000U);
+		if (os_res != osOK) {
+			Error_Handler();
+		}
+
+		auto esp_resp = consume_message();
+    	connected_to_control_server = false;
+    }
 
 	void push_message(std::string msg);
 	std::string consume_message();
 	void flush();
 
+	UART_HandleTypeDef& get_uart_handle() {
+		return huart;
+	}
+
 private:
 	UART_HandleTypeDef& huart;
 	std::queue<std::string> messages;
+	bool connected_to_control_server = false;
 
-	osMessageQueueId_t& external_queue;
+	osSemaphoreId_t& external_queue;
 	osSemaphoreId_t& data_ready_sem;
 };
 
