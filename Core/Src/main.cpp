@@ -865,7 +865,8 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOE, SEL0_Pin|SEL1_Pin|SEL2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, Panel0_Pin|Panel1_Pin|Panel2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_10|GPIO_PIN_11|Panel0_Pin|Panel1_Pin
+                          |Panel2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : SEL0_Pin SEL1_Pin SEL2_Pin */
   GPIO_InitStruct.Pin = SEL0_Pin|SEL1_Pin|SEL2_Pin;
@@ -874,8 +875,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : Panel0_Pin Panel1_Pin Panel2_Pin */
-  GPIO_InitStruct.Pin = Panel0_Pin|Panel1_Pin|Panel2_Pin;
+  /*Configure GPIO pins : PD10 PD11 Panel0_Pin Panel1_Pin
+                           Panel2_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_11|Panel0_Pin|Panel1_Pin
+                          |Panel2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -1186,7 +1189,10 @@ void update_data() {
 		selector.select(el.first);
 		curr_cell_id = el.first; // panel ID
 		smu.run_voltage_sweep();
-		osSemaphoreAcquire(smu_done_sem, osWaitForever);
+		auto smu_os_res = osSemaphoreAcquire(smu_done_sem, 120000U);
+		if (smu_os_res != osOK) {
+			Error_Handler();
+		}
 	}
 #else // smu, no selector (use connected panel for all panel IDs)
 //	for (auto& el : panels) {
@@ -1469,6 +1475,8 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
   for (;;) {
+	  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_11, GPIO_PIN_SET);
+	  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_10, GPIO_PIN_RESET); // ERROR
 	  Logger::registerInstance(&logger);
 	    logger.debug("Init");
 
@@ -1574,10 +1582,11 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+//  __disable_irq();
+//  while (1)
+//  {
+//  }
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_10, GPIO_PIN_SET);
   /* USER CODE END Error_Handler_Debug */
 }
 
